@@ -4,7 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#0a0c0f">
-<title>SEN BLE Probe V1.1.0</title>
+<title>SEN BLE Probe V1.1.1</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="probe-icon-192.png">
+<link rel="apple-touch-icon" href="probe-icon-192.png">
 <style>
 :root{--bg:#0a0c0f;--bg2:#11141a;--bg3:#171b22;--border:rgba(255,255,255,.1);--text:#f4f3ef;--text2:#bdbab1;--text3:#6f6d67;--accent:#7eb8c4;--gold:#c8a96e;--green:#7ab87a;--warn:#e07a5f;--red:#d4574e;--violet:#d9b3ff;--pink:#ff9ed8;--mono:'IBM Plex Mono','SF Mono',Menlo,Consolas,monospace}
 *{box-sizing:border-box;margin:0;padding:0}
@@ -66,7 +69,7 @@ table.shots td:first-child,table.shots th:first-child{text-align:left}
 </style>
 </head>
 <body>
-<h1>SEN · BLE Probe <span style="font-size:11px;color:var(--text3)">V1.1.0</span></h1>
+<h1>SEN · BLE Probe <span style="font-size:11px;color:var(--text3)">V1.1.1</span></h1>
 <div class="sub">Multi-device BLE diagnostic for the SEN platform. Device profiles: Calypso Mini (wind), FX Pocket Pro (chrono, GATT), FX True Ballistic (radar, GATT), FX Pocket V2/D1 (chrono, broadcast), Generic (anything else, e.g. a rangefinder). Chrome on Android or desktop, HTTPS only.</div>
 
 <!-- SETUP -->
@@ -109,7 +112,7 @@ table.shots td:first-child,table.shots th:first-child{text-align:left}
 
 <script>
 'use strict';
-const VERSION='1.1.0';
+const VERSION='1.1.1';
 const ISSC='49535343-fe7d-4ae5-8fa9-9fafd205e455';
 const NUS='6e400001-b5a3-f393-e0a9-e50e24dcca9e';
 const VRS='5445883a-3cab-42e5-b625-ca4e243f5a2c', VRS_VEL='5445883a-3cab-42e5-b625-ca4e243f5a2d', VRS_CMD='5445883a-3cab-42e5-b625-ca4e243f5a2e';
@@ -601,6 +604,7 @@ $('savebtn').addEventListener('click',()=>{
 $('clearbtn').addEventListener('click',()=>{LOG.length=0;$('log').textContent='';});
 setInterval(()=>DEVICES.forEach(d=>{if(d.profile==='calypso')calTag(d);}),1000);
 checkCaps().then(()=>log(null,'SEN BLE Probe V'+VERSION+' ready. '+CAPS.join(' · ')));
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(e=>log(null,'Service worker not registered: '+e.message,'er'));
 </script>
 </body>
 </html>

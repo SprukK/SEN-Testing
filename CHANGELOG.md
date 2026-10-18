@@ -2,6 +2,11 @@
 
 `index.html` is always the current probe; each version is kept alongside it for rollback.
 
+## V1.1.1 — 2026-10-18
+- Installable as its own app: added `manifest.json` (id `/sen-ble-probe-sprukk/`, scope `./`), probe icons with a BLE badge, and `sw.js` (network-first HTML, offline fallback, cache `sen-ble-probe-*`, separate from the calculator).
+- Fixes Chrome reporting the probe as "already installed" (no manifest, so Chrome had no separate app identity on the shared sprukk.github.io origin).
+- Verified: 25/25 DOM tests unchanged; headless Chromium shows manifest parsed with no errors, SW controlling, app id distinct from the calculator.
+
 ## V1.1.0 — 2026-10-18
 - Multi-device: unlimited simultaneous devices, each with its own card, state, GATT op queue, keepalive and colour label.
 - Device profiles (auto-detected, manually overridable):

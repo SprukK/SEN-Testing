@@ -1,0 +1,16 @@
+{
+  "id": "/sen-ble-probe-sprukk/",
+  "name": "SEN BLE Probe",
+  "short_name": "SEN Probe",
+  "description": "Multi-device BLE diagnostic for the SEN platform: Calypso wind meters, FX chronographs, unknown devices.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0a0c0f",
+  "theme_color": "#0a0c0f",
+  "icons": [
+    { "src": "probe-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "probe-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
