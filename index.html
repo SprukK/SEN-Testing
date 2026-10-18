@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0a0c0f">
+<title>SEN BLE Probe V1.0.0</title>
+<style>
+:root{--bg:#0a0c0f;--bg2:#11141a;--bg3:#171b22;--border:rgba(255,255,255,.1);--text:#f4f3ef;--text2:#bdbab1;--text3:#6f6d67;--accent:#7eb8c4;--gold:#c8a96e;--green:#7ab87a;--warn:#e07a5f;--red:#d4574e;--violet:#d9b3ff;--pink:#ff9ed8;--mono:'IBM Plex Mono','SF Mono',Menlo,Consolas,monospace}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--mono);font-size:13px;line-height:1.5;max-width:780px;margin:0 auto;padding:14px 14px calc(40px + env(safe-area-inset-bottom))}
+h1{font-size:17px;font-weight:700}
+.sub{font-size:10px;color:var(--text3);margin:2px 0 14px}
+.panel{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:12px}
+.panel h2{font-size:10px;color:var(--text3);letter-spacing:.12em;text-transform:uppercase;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:6px}
+.panel h2 .sp{flex:1}
+button{font-family:var(--mono);cursor:pointer;font-size:12px;padding:10px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:7px;color:var(--text);min-height:42px}
+button.primary{background:var(--accent);color:#0a0c0f;border-color:var(--accent);font-weight:600}
+button.gold{background:var(--gold);color:#0a0c0f;border-color:var(--gold);font-weight:600}
+button.warn{color:var(--warn);border-color:rgba(224,122,95,.4)}
+button.sm{min-height:auto;padding:4px 9px;font-size:10px}
+button:disabled{opacity:.4;pointer-events:none}
+input,select{font-family:var(--mono);font-size:13px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:9px;width:100%;min-height:40px}
+label.ck{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--text2);cursor:pointer;margin-top:6px}
+label.ck input{width:auto;min-height:auto;flex:0 0 auto}
+.lbl{font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin:8px 0 4px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.row>*{flex:1 1 120px}
+.row>button{flex:0 0 auto}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--text3);display:inline-block;margin-right:7px;vertical-align:middle}
+.dot.on{background:var(--green)}.dot.scan{background:var(--gold);animation:p 1s infinite}.dot.err{background:var(--red)}
+@keyframes p{50%{opacity:.4}}
+.scs{display:grid;grid-template-columns:repeat(auto-fit,minmax(86px,1fr));gap:8px}
+.sc{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:9px}
+.sc .l{font-size:8px;color:var(--text3);text-transform:uppercase}
+.sc .v{font-size:18px;font-weight:700;color:var(--accent);word-break:break-all}
+.sc .v.small{font-size:12px}
+.sc .u{font-size:8px;color:var(--text2)}
+.log{background:#06080b;border:1px solid var(--border);border-radius:8px;padding:10px;height:380px;overflow-y:auto;font-size:11px;line-height:1.6;white-space:pre-wrap;word-break:break-all}
+.log .rx{color:var(--green)}.log .tx{color:var(--gold)}.log .sys{color:var(--text3)}.log .er{color:var(--red)}.log .hl{color:var(--accent);font-weight:600}.log .wu{color:var(--gold);font-weight:600}.log .hs{color:var(--violet);font-weight:600}.log .other{color:var(--pink)}
+.note{font-size:10px;color:var(--text3);line-height:1.7;margin-top:8px}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.chip{font-size:11px;padding:7px 10px;color:var(--text2);min-height:auto}
+.tag{display:inline-block;padding:2px 7px;border-radius:4px;font-size:9px}
+.tag.stale{background:rgba(224,122,95,.15);color:var(--warn)}
+.tag.live{background:rgba(122,184,122,.15);color:var(--green)}
+.tag.idle{background:rgba(200,169,110,.15);color:var(--gold)}
+.disco{font-size:10px;color:var(--text2);line-height:1.7}
+.disco .svc{color:var(--violet);font-weight:600;margin-top:6px}
+.disco .chr{padding-left:12px}
+.steps{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.steps button{font-size:10px;padding:7px 9px;min-height:auto}
+.steps button.done{border-color:var(--violet);color:var(--violet)}
+.steps button.reply{border-color:var(--green);color:var(--green)}
+.steps button.silent{border-color:var(--warn);color:var(--warn)}
+</style>
+</head>
+<body>
+<h1>SEN · BLE Probe <span style="font-size:11px;color:var(--text3)">V1.0.0</span></h1>
+<div class="sub">Generic BLE diagnostic for the SEN platform. Built for the Calypso Mini AB variant comparison (WDOT-B1F9A6 works / new unit connects but no wind), reusable for TITAN 3K and the F5 e-ink peripheral. Chrome on Android or desktop, HTTPS only. Separate from the calculator: no release churn.</div>
+
+<!-- CONNECTION -->
+<div class="panel">
+  <h2>Connection</h2>
+  <div class="row">
+    <span style="flex:1 1 auto"><span class="dot" id="dot"></span><span id="status">Disconnected</span></span>
+    <button class="primary" id="connbtn">Connect</button>
+  </div>
+  <div class="lbl">Session label (prefixed on every log line, for A/B compare)</div>
+  <input id="label" value="A" maxlength="12">
+  <div class="lbl">Extra service UUIDs to expose (comma-separated, 16-bit hex or full 128-bit)</div>
+  <input id="extraSvc" placeholder="e.g. fff0, 6e400001-b5a3-f393-e0a9-e50e24dcca9e">
+  <label class="ck"><input type="checkbox" id="autoHs" checked> Auto-send Calypso handshake on connect (only if FFF1 found)</label>
+  <label class="ck"><input type="checkbox" id="subAll" checked> Subscribe to every notify/indicate characteristic</label>
+  <label class="ck"><input type="checkbox" id="readAll" checked> Read every readable characteristic once</label>
+  <div class="note">Web Bluetooth only reveals services listed up front. A large common set is pre-included (ISSC UART, Nordic UART, FFF0/FFE0/FFB0/FFE5, battery, device info, ESS, DFU). If the new unit hides wind on an unknown service, it will show 0 characteristics there; add its UUID above (from nRF Connect) and reconnect.</div>
+</div>
+
+<!-- SUMMARY -->
+<div class="panel">
+  <h2>Summary <span class="sp"></span><span class="tag" id="live-tag"></span></h2>
+  <div class="scs">
+    <div class="sc"><div class="l">Device</div><div class="v small" id="s-name">—</div></div>
+    <div class="sc"><div class="l">Services</div><div class="v" id="s-svc">—</div></div>
+    <div class="sc"><div class="l">Firmware :VR</div><div class="v small" id="s-fw">—</div></div>
+    <div class="sc"><div class="l">ID :GK</div><div class="v small" id="s-id">—</div></div>
+    <div class="sc"><div class="l">Battery</div><div class="v" id="s-batt">—</div><div class="u">%</div></div>
+  </div>
+  <div class="scs" style="margin-top:8px">
+    <div class="sc"><div class="l">Instant</div><div class="v" id="p-spd">—</div><div class="u">m/s</div></div>
+    <div class="sc"><div class="l">Average</div><div class="v" id="p-avg">—</div><div class="u">m/s</div></div>
+    <div class="sc"><div class="l">Direction</div><div class="v" id="p-dir">—</div><div class="u">deg</div></div>
+  </div>
+  <div class="scs" style="margin-top:8px">
+    <div class="sc"><div class="l">:WU frames</div><div class="v" id="c-wu">0</div></div>
+    <div class="sc"><div class="l">:AK acks</div><div class="v" id="c-ak">0</div></div>
+    <div class="sc"><div class="l">HDLC idle</div><div class="v" id="c-idle">0</div></div>
+    <div class="sc"><div class="l">Other RX</div><div class="v" id="c-oth">0</div></div>
+    <div class="sc"><div class="l">Unknown</div><div class="v" id="c-unk">0</div></div>
+  </div>
+</div>
+
+<!-- DISCOVERY -->
+<div class="panel">
+  <h2>Services &amp; characteristics</h2>
+  <div class="disco" id="disco">Connect to enumerate.</div>
+</div>
+
+<!-- CALYPSO HANDSHAKE -->
+<div class="panel">
+  <h2>Calypso handshake (proven on WDOT-B1F9A6)</h2>
+  <div class="row">
+    <button class="gold" id="hsbtn" style="flex:1 1 auto">Send full handshake</button>
+    <button id="kabtn" style="flex:1 1 auto">Start :CC keepalive</button>
+  </div>
+  <div class="lbl">Step-by-step: tap each in order, a few seconds apart. Green = device sent real data (not idle) within 1.5 s, orange = silence. Full handshake only marks steps as sent (violet)</div>
+  <div class="steps" id="steps"></div>
+  <div class="row" style="margin-top:8px">
+    <div><div class="lbl">Inter-command delay (ms)</div><input id="hsDelay" type="number" value="120" min="20" max="2000"></div>
+    <div><div class="lbl">Keepalive interval (s)</div><input id="kaInt" type="number" value="10" min="1" max="60"></div>
+  </div>
+  <div class="note">Exact captured bytes replayed, \r\r terminated, write-without-response to FFF1. Checksums (A7, 9F, 86) are not yet reverse-engineered. If the new unit stays silent to :PS,1,1,9F but acks :GK/:VR, its checksum or command set differs and an Anemotracker HCI snoop of the NEW unit is the next step.</div>
+</div>
+
+<!-- MANUAL WRITE -->
+<div class="panel">
+  <h2>Manual write</h2>
+  <div class="lbl">Target characteristic</div>
+  <select id="wtarget"><option value="">(connect first)</option></select>
+  <div class="row" style="margin-top:8px">
+    <div><div class="lbl">Mode</div><select id="wmode"><option value="ascii">ASCII</option><option value="hex">Hex bytes</option></select></div>
+    <div><div class="lbl">ASCII terminator</div><select id="wterm"><option value="rr">\r\r (Calypso)</option><option value="r">\r</option><option value="rn">\r\n</option><option value="n">\n</option><option value="none">none</option></select></div>
+    <div><div class="lbl">Write type</div><select id="wtype"><option value="auto">auto</option><option value="nr">without response</option><option value="wr">with response</option></select></div>
+  </div>
+  <div class="row" style="margin-top:8px">
+    <input id="cmd" placeholder=":PS,1,1,9F   or   3a 50 53 0d 0d">
+    <button class="primary" id="sendbtn">Send</button>
+  </div>
+  <div class="chips" id="presets"></div>
+</div>
+
+<!-- LOG -->
+<div class="panel">
+  <h2>Log <span class="sp"></span>
+    <button class="sm" id="pausebtn">Pause</button>
+    <button class="sm" id="copybtn">Copy</button>
+    <button class="sm" id="savebtn">Save .txt</button>
+    <button class="sm" id="clearbtn">Clear</button>
+  </h2>
+  <label class="ck" style="margin:0 0 8px"><input type="checkbox" id="hideIdle"> Collapse repeated HDLC idle frames</label>
+  <div class="log" id="log"></div>
+  <div class="note"><span style="color:var(--green)">green</span> RX data · <span style="color:var(--gold)">gold</span> :WU wind · <span style="color:var(--violet)">violet</span> handshake TX · <span style="color:var(--pink)">pink</span> RX on any non-FFF2 characteristic · <span style="color:var(--accent)">blue</span> decoded / reads.</div>
+</div>
+
+<script>
+'use strict';
+const VERSION='1.0.0';
+const ISSC='49535343-fe7d-4ae5-8fa9-9fafd205e455';
+const BASE_SVCS=[ISSC,'6e400001-b5a3-f393-e0a9-e50e24dcca9e',0xFFF0,0xFFE0,0xFFE5,0xFFB0,0xFFD0,0xFEE7,0xFE59,0x180F,0x180A,0x1800,0x1801,0x181A,0x1530];
+const HANDSHAKE=[':DU,1668647648,A7',':GK',':PS,1,1,9F',':WU,5',':WU,6',':VR'];
+const KEEPALIVE=':CC,6,86';
+const PRESETS=[...HANDSHAKE,KEEPALIVE,':PS,1,0'];
+const $=id=>document.getElementById(id);
+
+let dev=null,server=null,writables=[],fff1=null,fff2=null;
+let rxBuf={};             // per-characteristic ASCII reassembly
+let pendingGK=null,kaTimer=null,staleTimer=null;
+let lastWu=0,lastRx=0,paused=false,idleRun=0;
+const cnt={wu:0,ak:0,idle:0,oth:0,unk:0};
+const logLines=[];
+
+/* ---------- logging (textContent only, no innerHTML sinks) ---------- */
+function ts(){const d=new Date();return d.toLocaleTimeString('en-GB',{hour12:false})+'.'+String(d.getMilliseconds()).padStart(3,'0');}
+function log(msg,cls){
+  const line='['+$('label').value+' '+ts()+'] '+msg;
+  logLines.push(line);
+  if(paused)return;
+  const el=$('log'),span=document.createElement('span');
+  span.className=cls||'sys';span.textContent=line+'\n';el.appendChild(span);
+  while(el.childNodes.length>1500)el.removeChild(el.firstChild);
+  el.scrollTop=el.scrollHeight;
+}
+function hexOf(b){return Array.from(b).map(x=>x.toString(16).padStart(2,'0')).join(' ');}
+function ascOf(b){return Array.from(b).map(x=>x>=0x20&&x<0x7f?String.fromCharCode(x):(x===13?'⏎':'.')).join('');}
+function short(u){const m=/^0000([0-9a-f]{4})-0000-1000-8000-00805f9b34fb$/.exec(u);return m?m[1]:u.slice(0,8);}
+function bump(k){cnt[k]++;$('c-'+k).textContent=cnt[k];}
+function setStatus(s,cls){$('dot').className='dot '+(cls||'');$('status').textContent=s;$('connbtn').textContent=(dev&&dev.gatt&&dev.gatt.connected)?'Disconnect':'Connect';}
+function setLiveTag(){
+  const t=$('live-tag'),age=(Date.now()-lastWu)/1000;
+  if(lastWu&&age<3){t.className='tag live';t.textContent='LIVE · '+cnt.wu+' :WU';}
+  else if(lastWu){t.className='tag stale';t.textContent='STALE '+age.toFixed(0)+' s';}
+  else if(cnt.idle){t.className='tag idle';t.textContent='IDLE · needs handshake';}
+  else if(dev&&dev.gatt.connected){t.className='tag';t.textContent='no wind data';}
+  else{t.className='tag';t.textContent='';}
+}
+
+/* ---------- connection ---------- */
+function parseExtraSvcs(){
+  return $('extraSvc').value.split(',').map(s=>s.trim().toLowerCase()).filter(Boolean).map(s=>/^[0-9a-f]{4}$/.test(s)?parseInt(s,16):s);
+}
+async function toggleBLE(){
+  if(!(navigator.bluetooth&&navigator.bluetooth.requestDevice)){alert('Web Bluetooth not available. Use Chrome on Android or Chrome/Edge desktop over HTTPS (not iOS).');return;}
+  if(dev&&dev.gatt.connected){dev.gatt.disconnect();return;}
+  try{
+    setStatus('Scanning…','scan');
+    dev=await navigator.bluetooth.requestDevice({acceptAllDevices:true,optionalServices:[...BASE_SVCS,...parseExtraSvcs()]});
+    $('s-name').textContent=dev.name||'(no name)';
+    log('Probe V'+VERSION+' · selected "'+(dev.name||'?')+'" id='+dev.id,'hl');
+    dev.addEventListener('gattserverdisconnected',onDisconnect);
+    for(let a=1;a<=3;a++){
+      try{server=await dev.gatt.connect();await new Promise(r=>setTimeout(r,500));log('GATT connected (attempt '+a+')');break;}
+      catch(e){log('connect attempt '+a+' failed: '+e.message,'er');if(a===3)throw e;await new Promise(r=>setTimeout(r,900));}
+    }
+    await discover();
+    setStatus('Connected: '+(dev.name||'?'),'on');
+    staleTimer=setInterval(setLiveTag,1000);setLiveTag();
+    if($('autoHs').checked&&fff1){log('Auto-handshake in 600 ms…');setTimeout(runHandshake,600);}
+    else if(!fff1)log('FFF1 not found: Calypso handshake unavailable. Check the discovery panel.','er');
+  }catch(e){log('ERROR: '+e.message,'er');setStatus('Error','err');}
+}
+function onDisconnect(){
+  log('GATT disconnected.','er');
+  stopKeepalive();if(staleTimer){clearInterval(staleTimer);staleTimer=null;}
+  fff1=fff2=null;writables=[];rxBuf={};setStatus('Disconnected');setLiveTag();
+}
+
+async function discover(){
+  const disco=$('disco');disco.textContent='';
+  let services=[];
+  try{services=await server.getPrimaryServices();}catch(e){log('getPrimaryServices failed: '+e.message,'er');}
+  $('s-svc').textContent=services.length;
+  log('Discovered '+services.length+' exposed primary service(s).','hl');
+  writables=[];fff1=fff2=null;
+  for(const svc of services){
+    const sd=document.createElement('div');sd.className='svc';sd.textContent=svc.uuid;disco.appendChild(sd);
+    log('SVC '+svc.uuid,'hl');
+    let chars=[];
+    try{chars=await svc.getCharacteristics();}catch(e){log('  cannot list chars: '+e.message,'er');continue;}
+    if(!chars.length){const n=document.createElement('div');n.className='chr';n.textContent='(no characteristics exposed)';disco.appendChild(n);}
+    for(const c of chars){
+      const p=c.properties,props=[];
+      if(p.read)props.push('read');if(p.write)props.push('write');if(p.writeWithoutResponse)props.push('writeNR');
+      if(p.notify)props.push('notify');if(p.indicate)props.push('indicate');
+      const cd=document.createElement('div');cd.className='chr';cd.textContent=short(c.uuid)+'  ['+props.join(', ')+']  '+c.uuid;disco.appendChild(cd);
+      log('  CHR '+short(c.uuid)+' ['+props.join(', ')+']');
+      const id=short(c.uuid);
+      if(id==='fff1')fff1=c;
+      if(id==='fff2')fff2=c;
+      if(p.write||p.writeWithoutResponse)writables.push(c);
+      if(p.read&&$('readAll').checked){
+        try{const v=new Uint8Array((await c.readValue()).buffer);log('    READ '+id+' = '+hexOf(v)+'  "'+ascOf(v)+'"','hl');
+          if(id==='2a19'&&v.length)setBatt(v[0],'0x2A19');}
+        catch(e){log('    read '+id+' failed: '+e.message);}
+      }
+      if((p.notify||p.indicate)&&(id==='fff2'||$('subAll').checked)){
+        try{await c.startNotifications();c.addEventListener('characteristicvaluechanged',ev=>onRx(ev,c.uuid));log('    subscribed '+id,'hl');}
+        catch(e){log('    subscribe '+id+' failed: '+e.message,'er');}
+      }
+    }
+  }
+  const sel=$('wtarget');sel.textContent='';
+  writables.forEach((c,i)=>{const o=document.createElement('option');o.value=i;o.textContent=short(c.uuid)+' · '+c.service.uuid.slice(0,8);sel.appendChild(o);});
+  const i=fff1?writables.indexOf(fff1):0;if(writables.length)sel.value=String(Math.max(0,i));
+  else{const o=document.createElement('option');o.textContent='(no writable characteristic)';sel.appendChild(o);}
+}
+
+/* ---------- RX ---------- */
+function onRx(ev,uuid){
+  const b=new Uint8Array(ev.target.value.buffer),id=short(uuid);
+  if(id!=='fff2'){
+    bump('oth');log('RX['+id+'] ['+b.length+'B] '+hexOf(b)+'  "'+ascOf(b)+'"','other');
+    if(id==='2a19'&&b.length)setBatt(b[0],'notify');
+  }
+  // HDLC-framed idle (7e … 7e)
+  if(b.length>=4&&b[0]===0x7e&&b[b.length-1]===0x7e){
+    bump('idle');
+    if($('hideIdle').checked&&idleRun++>0){return;}
+    log('RX['+id+'] ['+b.length+'B] '+hexOf(b)+'  «HDLC idle» "'+ascOf(b.slice(1,-1))+'"','rx');return;
+  }
+  idleRun=0;lastRx=Date.now();   // only real (non-idle) data counts as a reply
+  if(id==='fff2')log('RX['+id+'] ['+b.length+'B] '+hexOf(b)+'  "'+ascOf(b)+'"','rx');
+  rxBuf[id]=(rxBuf[id]||'')+new TextDecoder().decode(b);
+  const parts=rxBuf[id].split('\r');rxBuf[id]=parts.pop();
+  if(rxBuf[id].length>512){log('  buffer overflow on '+id+', flushed: "'+rxBuf[id].slice(0,60)+'…"','er');rxBuf[id]='';}
+  for(const raw of parts){const s=raw.trim();if(s)parseSentence(s,id);}
+}
+function setBatt(v,src){const el=$('s-batt');el.textContent=v;el.style.color=v>50?'var(--green)':v>20?'var(--gold)':'var(--red)';if(src)log('  battery '+v+'% ('+src+')','hl');}
+function applyGK(idv,batt){$('s-id').textContent=idv||'?';const n=parseInt(batt,10);if(!isNaN(n))setBatt(n,':GK');log('  → :GK id='+(idv||'?')+' batt='+batt,'hl');}
+function parseSentence(s,id){
+  if(s.startsWith(':WU')){
+    const f=s.split(',');
+    if(f.length>=5&&f[1]==='2'){
+      const i=parseFloat(f[2]),a=parseFloat(f[3]),d=parseFloat(f[4]);
+      if(!isNaN(i))$('p-spd').textContent=i.toFixed(1);
+      if(!isNaN(a))$('p-avg').textContent=a.toFixed(1);
+      if(!isNaN(d))$('p-dir').textContent=Math.round(d);
+      lastWu=Date.now();bump('wu');setLiveTag();
+      log('  → :WU inst='+f[2]+' avg='+f[3]+' dir='+f[4]+' ('+f.length+' fields)','wu');
+    }else{log('  → :WU non-standard ('+f.length+' fields): '+s,'hl');bump('unk');}
+  }else if(s.startsWith(':GK')){
+    const f=s.split(',');if(f.length>=3)applyGK(f[1],f[2]);else{pendingGK=f[1]||'';log('  → :GK id='+pendingGK+' (batt in next fragment)');}
+  }else if(pendingGK!==null&&s.startsWith(',')){applyGK(pendingGK,s.slice(1).trim());pendingGK=null;}
+  else if(s.startsWith(':VR')){const f=s.split(',');$('s-fw').textContent=(f[1]||'?').trim()+' '+(f[2]||'').trim();log('  → :VR '+s,'hl');}
+  else if(s.startsWith(':AK')){bump('ak');log('  → :AK '+s,'hl');}
+  else if(s.startsWith(':CC')){log('  → :CC '+s);}
+  else{bump('unk');log('  → UNKNOWN on '+id+': '+s,'hl');}
+}
+
+/* ---------- TX ---------- */
+function termBytes(){return {rr:[13,13],r:[13],rn:[13,10],n:[10],none:[]}[$('wterm').value];}
+function asciiBytes(s,term){const o=[];for(const ch of s)o.push(ch.charCodeAt(0)&0xff);return new Uint8Array([...o,...term]);}
+async function writeTo(c,bytes,mode){
+  mode=mode||$('wtype').value;
+  if(mode==='nr'||(mode==='auto'&&c.properties.writeWithoutResponse))await c.writeValueWithoutResponse(bytes);
+  else await c.writeValueWithResponse(bytes);
+}
+function watchReply(btn){
+  const t0=Date.now();
+  setTimeout(()=>{if(!btn)return;btn.classList.remove('done');btn.classList.add(lastRx>t0?'reply':'silent');},1500);
+}
+async function sendCalypso(s,btn,why,watch){
+  if(!fff1){alert('FFF1 not available. Connect first.');return false;}
+  try{
+    const b=asciiBytes(s,[13,13]);await writeTo(fff1,b,'auto');
+    log('TX→fff1 '+s+'  ['+hexOf(b)+']'+(why?' '+why:''),'hs');
+    if(btn){btn.classList.remove('reply','silent');btn.classList.add('done');if(watch)watchReply(btn);}
+    return true;
+  }catch(e){log('TX ERROR '+s+': '+e.message,'er');return false;}
+}
+async function runHandshake(){
+  log('=== HANDSHAKE START ===','hs');
+  const delay=Math.max(20,parseInt($('hsDelay').value,10)||120);
+  const btns=$('steps').querySelectorAll('button');
+  for(let i=0;i<HANDSHAKE.length;i++){await sendCalypso(HANDSHAKE[i],btns[i],'('+(i+1)+'/'+HANDSHAKE.length+')');await new Promise(r=>setTimeout(r,delay));}
+  await sendCalypso(KEEPALIVE,btns[HANDSHAKE.length],'(initial)');
+  log('=== HANDSHAKE SENT ===','hs');startKeepalive();
+}
+function startKeepalive(){
+  if(kaTimer)return;
+  const sec=Math.max(1,parseInt($('kaInt').value,10)||10);
+  kaTimer=setInterval(()=>{if(dev&&dev.gatt.connected)sendCalypso(KEEPALIVE,null,'(keepalive)');},sec*1000);
+  $('kabtn').textContent='Stop :CC keepalive';log('Keepalive started ('+sec+' s).');
+}
+function stopKeepalive(){if(kaTimer){clearInterval(kaTimer);kaTimer=null;log('Keepalive stopped.');}$('kabtn').textContent='Start :CC keepalive';}
+async function sendManual(){
+  const c=writables[parseInt($('wtarget').value,10)];
+  if(!c){alert('No writable characteristic selected.');return;}
+  const raw=$('cmd').value;let bytes;
+  try{
+    if($('wmode').value==='hex'){
+      const toks=raw.replace(/0x/gi,' ').replace(/,/g,' ').trim().split(/\s+/).filter(Boolean);
+      bytes=new Uint8Array(toks.map(t=>{const n=parseInt(t,16);if(isNaN(n)||n<0||n>255||!/^[0-9a-f]{1,2}$/i.test(t))throw new Error('bad byte "'+t+'"');return n;}));
+    }else bytes=asciiBytes(raw,termBytes());
+  }catch(e){alert(e.message);return;}
+  if(!bytes.length){alert('Nothing to send.');return;}
+  try{await writeTo(c,bytes);log('TX→'+short(c.uuid)+' ['+hexOf(bytes)+']  "'+ascOf(bytes)+'"','tx');}
+  catch(e){log('TX ERROR: '+e.message,'er');}
+}
+
+/* ---------- log tools ---------- */
+function exportText(){return 'SEN BLE Probe V'+VERSION+' · '+new Date().toISOString()+' · '+navigator.userAgent+'\n'+logLines.join('\n');}
+function saveLog(){
+  const blob=new Blob([exportText()],{type:'text/plain'}),a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);a.download='sen-ble-probe-'+($('label').value||'log')+'-'+new Date().toISOString().replace(/[:.]/g,'-')+'.txt';
+  document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);
+}
+
+/* ---------- wiring ---------- */
+$('connbtn').addEventListener('click',toggleBLE);
+$('hsbtn').addEventListener('click',runHandshake);
+$('kabtn').addEventListener('click',()=>kaTimer?stopKeepalive():startKeepalive());
+$('sendbtn').addEventListener('click',sendManual);
+$('cmd').addEventListener('keydown',e=>{if(e.key==='Enter')sendManual();});
+$('pausebtn').addEventListener('click',()=>{paused=!paused;$('pausebtn').textContent=paused?'Resume':'Pause';if(!paused)log('(display resumed — paused lines are in Save/Copy)');});
+$('copybtn').addEventListener('click',()=>{navigator.clipboard&&navigator.clipboard.writeText(exportText()).then(()=>log('Log copied ('+logLines.length+' lines).'));});
+$('savebtn').addEventListener('click',saveLog);
+$('clearbtn').addEventListener('click',()=>{$('log').textContent='';logLines.length=0;});
+[...HANDSHAKE,KEEPALIVE].forEach((s,i)=>{
+  const b=document.createElement('button');b.textContent=(i+1)+' '+s;b.addEventListener('click',()=>sendCalypso(s,b,'(manual step)',true));$('steps').appendChild(b);
+});
+PRESETS.forEach(p=>{
+  const b=document.createElement('button');b.className='chip';b.textContent=p;
+  b.addEventListener('click',()=>{$('cmd').value=p;$('wmode').value='ascii';$('wterm').value='rr';});$('presets').appendChild(b);
+});
+log('SEN BLE Probe V'+VERSION+' ready. '+(navigator.bluetooth?'Web Bluetooth available.':'Web Bluetooth NOT available in this browser.'),navigator.bluetooth?'sys':'er');
+</script>
+</body>
+</html>
