@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#0a0c0f">
-<title>SEN BLE Probe V1.1.1</title>
+<title>SEN BLE Probe V1.2.0</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="probe-icon-192.png">
 <link rel="apple-touch-icon" href="probe-icon-192.png">
@@ -69,7 +69,7 @@ table.shots td:first-child,table.shots th:first-child{text-align:left}
 </style>
 </head>
 <body>
-<h1>SEN · BLE Probe <span style="font-size:11px;color:var(--text3)">V1.1.1</span></h1>
+<h1>SEN · BLE Probe <span style="font-size:11px;color:var(--text3)">V1.2.0</span></h1>
 <div class="sub">Multi-device BLE diagnostic for the SEN platform. Device profiles: Calypso Mini (wind), FX Pocket Pro (chrono, GATT), FX True Ballistic (radar, GATT), FX Pocket V2/D1 (chrono, broadcast), Generic (anything else, e.g. a rangefinder). Chrome on Android or desktop, HTTPS only.</div>
 
 <!-- SETUP -->
@@ -92,6 +92,14 @@ table.shots td:first-child,table.shots th:first-child{text-align:left}
   <details open><summary>Browser capabilities</summary><div class="caps" id="caps"></div></details>
 </div>
 
+<!-- MAIN APP DATA (CORE-09) -->
+<div class="panel" id="mainpanel">
+  <h2>Main app data <span class="sp"></span><button class="sm" id="mainbtn">Refresh</button></h2>
+  <div class="small" id="mainstatus">Reading…</div>
+  <div class="scs" id="mainsession"></div>
+  <div class="note">Read-only view of the SEN calculator's profiles on this phone (same sprukk.github.io origin). The probe never writes to the calculator's storage and never creates it. Re-read whenever you come back to this app.</div>
+</div>
+
 <div id="devices"></div>
 
 <!-- LOG -->
@@ -112,7 +120,7 @@ table.shots td:first-child,table.shots th:first-child{text-align:left}
 
 <script>
 'use strict';
-const VERSION='1.1.1';
+const VERSION='1.2.0';
 const ISSC='49535343-fe7d-4ae5-8fa9-9fafd205e455';
 const NUS='6e400001-b5a3-f393-e0a9-e50e24dcca9e';
 const VRS='5445883a-3cab-42e5-b625-ca4e243f5a2c', VRS_VEL='5445883a-3cab-42e5-b625-ca4e243f5a2d', VRS_CMD='5445883a-3cab-42e5-b625-ca4e243f5a2e';
@@ -180,14 +188,74 @@ function stats(arr){
   const sd=n>1?Math.sqrt(arr.reduce((a,b)=>a+(b-mean)*(b-mean),0)/(n-1)):NaN;
   return {n,mean,es,sd};
 }
+/* ---------- CORE-09: read-only access to the Main app's data ----------
+   Storage contract (both repos): Main owns IndexedDB 'sen_main' (store 'kv', key 'db', value = the
+   JSON snapshot), localStorage 'sen_platform_v1', caches 'sen-ballistics-*'. The Lab owns 'sen_lab',
+   'sen_lab_*', 'sen-ble-probe-*'. This reader opens Main's database WITHOUT a version and aborts the
+   upgrade if it doesn't exist yet — so it never creates an empty 'sen_main' (that would break Main's
+   first launch) — uses read-only transactions only, closes the connection at once (never blocks a
+   Main upgrade), falls back to Main's localStorage copy, and refuses snapshots whose schema is newer
+   than this reader knows. */
+const MAIN_STORE={idb:'sen_main',store:'kv',key:'db',ls:'sen_platform_v1'};
+const MAIN_SCHEMA={rifles:1,projectiles:1,weathers:1,scopes:1,reticles:1,dopeCards:2};
+const SenMainData={
+  readIdb(){return new Promise(res=>{
+    if(!window.indexedDB)return res(null);
+    let r;try{r=indexedDB.open(MAIN_STORE.idb);}catch(e){return res(null);}
+    r.onupgradeneeded=e=>{e.target.transaction.abort();};      // didn't exist: create nothing
+    r.onerror=e=>{e.preventDefault();res(null);};
+    r.onblocked=()=>res(null);
+    r.onsuccess=()=>{const db=r.result;
+      if(!db.objectStoreNames.contains(MAIN_STORE.store)){db.close();return res(null);}
+      const q=db.transaction(MAIN_STORE.store,'readonly').objectStore(MAIN_STORE.store).get(MAIN_STORE.key);
+      q.onsuccess=()=>{db.close();res(q.result==null?null:q.result);};
+      q.onerror=()=>{db.close();res(null);};};
+  });},
+  async read(){
+    let raw=await this.readIdb(),src='IndexedDB';
+    if(raw==null){try{raw=localStorage.getItem(MAIN_STORE.ls);}catch(e){raw=null;}src='localStorage';}
+    if(raw==null)return{src:null,data:null,err:null};
+    let d;try{d=JSON.parse(raw);}catch(e){return{src,data:null,err:'unreadable ('+e.message+')'};}
+    const newer=Object.keys(d&&d.schema||{}).filter(k=>(d.schema[k]||0)>(MAIN_SCHEMA[k]||0));
+    if(newer.length)return{src,data:null,err:'newer than this probe understands ('+newer.map(k=>k+' v'+d.schema[k]).join(', ')+') — update the Lab app'};
+    return{src,data:d,err:null};
+  }
+};
+let MAIN=null;
+function mainSession(){
+  const d=MAIN&&MAIN.data;if(!d||!d.session)return{};
+  const s=d.session,find=(k,id)=>(d[k]||[]).find(x=>x.id===id)||null;
+  const proj=find('projectiles',s.projId),drag=s.drag||'g7';
+  return{rifle:find('rifles',s.rifleId),proj,wx:find('weathers',s.curWxId),drag,bc:proj?(drag==='g1'?proj.bcg1:proj.bcg7):null};
+}
+async function loadMain(){
+  MAIN=await SenMainData.read();
+  const st=$('mainstatus'),box=$('mainsession');if(!st)return;
+  box.textContent='';
+  if(MAIN.err)st.textContent='⚠ Main app data '+MAIN.err+'.';
+  else if(!MAIN.data)st.textContent='No SEN calculator data on this phone yet — open the calculator once.';
+  else{const d=MAIN.data,n=k=>(d[k]||[]).length;
+    st.textContent='Found in '+MAIN.src+' · '+n('rifles')+' rifles · '+n('projectiles')+' projectiles · '+n('scopes')+' scopes · '+n('weathers')+' weathers · '+n('dopeCards')+' dope cards';
+    const m=mainSession(),t=(l,v,u)=>{const x=tile(l,u);x.v.textContent=v;x.v.classList.add('small');return x;};
+    box.append(t('Rifle',m.rifle?m.rifle.name:'—'),t('Profile MV',m.rifle&&m.rifle.mv>0?m.rifle.mv.toFixed(1):'—','m/s'),
+      t('Projectile',m.proj?m.proj.name:'—'),t('BC '+m.drag.toUpperCase(),m.bc>0?m.bc.toFixed(4):'pending','lb/in²'),t('Weather',m.wx?m.wx.name:'—'));}
+  DEVICES.forEach(renderShots);
+}
+function mvCompareText(s){
+  const m=mainSession();
+  if(!s||!m.rifle||!(m.rifle.mv>0))return'';
+  const dv=s.mean-m.rifle.mv;
+  return 'vs Main profile MV ('+m.rifle.name+'): '+m.rifle.mv.toFixed(1)+' m/s → average '+(dv>=0?'+':'−')+Math.abs(dv).toFixed(2)+' m/s ('+(dv>=0?'+':'−')+Math.abs(dv/m.rifle.mv*100).toFixed(1)+' %)';
+}
 function buildShotUI(d,box,extraCols){
   const t={n:tile('Shots'),last:tile('Last','m/s'),avg:tile('Average','m/s'),es:tile('ES','m/s · target ≤5'),sd:tile('SD','m/s · target ≤1.5')};
   box.appendChild(el('div',{class:'scs'},t.n,t.last,t.avg,t.es,t.sd));
+  const mv=el('div',{class:'note mvcmp'});box.appendChild(mv);
   const tb=el('tbody');
   const head=el('tr',null,el('th',null,'#'),el('th',null,'Time'),el('th',null,'m/s'),el('th',null,'fps'),...extraCols.map(c=>el('th',null,c)));
   box.appendChild(el('div',{class:'shotwrap'},el('table',{class:'shots'},el('thead',null,head),tb)));
   box.appendChild(el('div',{class:'row',style:'margin-top:8px'},el('button',{class:'sm warn',onclick:()=>{d.shots=[];renderShots(d);log(d,'Shot string reset.');}},'Reset string')));
-  d.ui.shot={t,tb,extraCols};renderShots(d);
+  d.ui.shot={t,tb,extraCols,mv};renderShots(d);
 }
 function addShot(d,ms,extra,src){
   if(!(ms>0&&ms<3048)){log(d,'  rejected implausible velocity '+ms,'er');return;}
@@ -200,6 +268,7 @@ function renderShots(d){
   u.t.n.v.textContent=d.shots.length;
   u.t.last.v.textContent=d.shots.length?d.shots[d.shots.length-1].ms.toFixed(2):'—';
   u.t.avg.v.textContent=s?s.mean.toFixed(2):'—';
+  u.mv.textContent=mvCompareText(s);
   u.t.es.v.textContent=s&&s.n>1?s.es.toFixed(2):'—';u.t.es.v.className='v'+(s&&s.n>1?(s.es<=5?' ok':' bad'):'');
   u.t.sd.v.textContent=s&&s.n>1?s.sd.toFixed(2):'—';u.t.sd.v.className='v'+(s&&s.n>1?(s.sd<=1.5?' ok':' bad'):'');
   u.tb.textContent='';
@@ -603,6 +672,9 @@ $('savebtn').addEventListener('click',()=>{
 });
 $('clearbtn').addEventListener('click',()=>{LOG.length=0;$('log').textContent='';});
 setInterval(()=>DEVICES.forEach(d=>{if(d.profile==='calypso')calTag(d);}),1000);
+$('mainbtn').addEventListener('click',loadMain);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')loadMain();});
+loadMain();
 checkCaps().then(()=>log(null,'SEN BLE Probe V'+VERSION+' ready. '+CAPS.join(' · ')));
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(e=>log(null,'Service worker not registered: '+e.message,'er'));
 </script>

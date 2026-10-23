@@ -2,6 +2,13 @@
 
 `index.html` is always the current probe; each version is kept alongside it for rollback.
 
+## V1.2.0 — 2026-10-23
+- **Main app data (CORE-09).** New panel showing the SEN calculator's data on this phone, read over the shared `sprukk.github.io` origin: where it was found (IndexedDB, or Main's localStorage fallback), profile counts, and the active session (rifle, profile MV, projectile, BC for the session's drag model, weather). Refresh button; re-reads automatically when you return to the app.
+- **Read-only by construction** (`SenMainData`): opens Main's `sen_main` database without a version and aborts if it doesn't exist (never creates it — that would break Main's first launch), read-only transactions only, closes the connection immediately (never blocks a Main upgrade), refuses snapshots with a schema newer than it knows, reports unreadable data instead of throwing.
+- **Chrono vs profile MV:** every chronograph card shows the shot-string average against the active Main rifle's profile MV, in m/s and %.
+- Storage contract with Main: Main owns `sen_main` / `sen_platform_*` / `sen-ballistics-*`; the Lab owns `sen_lab` / `sen_lab_*` / `sen-ble-probe-*`. Main V1.25.1 stops deleting this app's offline cache on its own releases.
+- Tests now live in the repo: `tests/probetest.js` (the 25 V1.1.0 device checks, recovered) and new `tests/maindatatest.js` (13 checks against the real Main app). Verified: node --check; probetest ALL PASS (25); maindatatest 13/13; real Chromium with both apps on one origin reads Main's data.
+
 ## V1.1.1 — 2026-10-18
 - Installable as its own app: added `manifest.json` (id `/sen-ble-probe-sprukk/`, scope `./`), probe icons with a BLE badge, and `sw.js` (network-first HTML, offline fallback, cache `sen-ble-probe-*`, separate from the calculator).
 - Fixes Chrome reporting the probe as "already installed" (no manifest, so Chrome had no separate app identity on the shared sprukk.github.io origin).
