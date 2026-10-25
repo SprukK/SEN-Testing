@@ -4,14 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#0a0c0f">
-<title>SEN BLE Probe V1.2.0</title>
+<title>SEN BLE Probe V1.3.0</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="probe-icon-192.png">
 <link rel="apple-touch-icon" href="probe-icon-192.png">
 <style>
 :root{--bg:#0a0c0f;--bg2:#11141a;--bg3:#171b22;--border:rgba(255,255,255,.1);--text:#f4f3ef;--text2:#bdbab1;--text3:#6f6d67;--accent:#7eb8c4;--gold:#c8a96e;--green:#7ab87a;--warn:#e07a5f;--red:#d4574e;--violet:#d9b3ff;--pink:#ff9ed8;--mono:'IBM Plex Mono','SF Mono',Menlo,Consolas,monospace}
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--bg);color:var(--text);font-family:var(--mono);font-size:13px;line-height:1.5;max-width:820px;margin:0 auto;padding:14px 14px calc(40px + env(safe-area-inset-bottom))}
+body{background:var(--bg);color:var(--text);font-family:var(--mono);font-size:13px;line-height:1.5;max-width:820px;margin:0 auto;padding:14px 14px calc(84px + env(safe-area-inset-bottom))}
 h1{font-size:17px;font-weight:700}
 .sub{font-size:10px;color:var(--text3);margin:2px 0 14px}
 .panel{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:12px}
@@ -66,11 +66,28 @@ table.shots td{text-align:right;padding:3px 6px;border-bottom:1px solid rgba(255
 table.shots td:first-child,table.shots th:first-child{text-align:left}
 .shotwrap{max-height:220px;overflow-y:auto}
 .caps{font-size:10px;color:var(--text2);line-height:1.8}
+/* V1.3.0 tabs + status strip + capture */
+.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:40;display:flex;gap:4px;padding:6px 8px calc(6px + env(safe-area-inset-bottom));background:rgba(10,12,15,.97);border-top:1px solid var(--border)}
+.tabbar button{flex:1 1 0;min-height:48px;font-size:11px;background:transparent;border-color:transparent}
+.tabbar button.on{background:var(--bg3);border-color:var(--accent);color:var(--accent);font-weight:600}
+.strip{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:-6px 0 12px;min-height:28px}
+.chip{min-height:30px;padding:4px 10px;font-size:11px;display:inline-flex;align-items:center;gap:6px;border-color:var(--c,var(--border))}
+#capmarks button{font-size:11px;padding:9px 11px}
+table.capsum{width:100%;border-collapse:collapse;font-size:10px;margin-top:8px}
+table.capsum th{font-size:8px;color:var(--text3);text-transform:uppercase;text-align:left;padding:3px 5px;border-bottom:1px solid var(--border)}
+table.capsum td{padding:4px 5px;border-bottom:1px solid rgba(255,255,255,.04);color:var(--text2);vertical-align:top}
+table.capsum td.hexcell{word-break:break-all;color:var(--text)}
+table.capsum td.chg{color:var(--gold);font-weight:600}
+.capwrap{max-height:340px;overflow:auto}
+pre.dump{font-size:10px;white-space:pre-wrap;word-break:break-all;color:var(--text2);margin-top:8px}
 </style>
 </head>
 <body>
-<h1>SEN · BLE Probe <span style="font-size:11px;color:var(--text3)">V1.2.0</span></h1>
+<h1>SEN · BLE Probe <span style="font-size:11px;color:var(--text3)">V1.3.0</span></h1>
 <div class="sub">Multi-device BLE diagnostic for the SEN platform. Device profiles: Calypso Mini (wind), FX Pocket Pro (chrono, GATT), FX True Ballistic (radar, GATT), FX Pocket V2/D1 (chrono, broadcast), Generic (anything else, e.g. a rangefinder). Chrome on Android or desktop, HTTPS only.</div>
+<div class="strip" id="strip" aria-label="Devices"></div>
+
+<section id="tab-devices">
 
 <!-- SETUP -->
 <div class="panel">
@@ -92,6 +109,10 @@ table.shots td:first-child,table.shots th:first-child{text-align:left}
   <details open><summary>Browser capabilities</summary><div class="caps" id="caps"></div></details>
 </div>
 
+<div id="devices"></div>
+</section>
+
+<section id="tab-data" hidden>
 <!-- MAIN APP DATA (CORE-09) -->
 <div class="panel" id="mainpanel">
   <h2>Main app data <span class="sp"></span><button class="sm" id="mainbtn">Refresh</button></h2>
@@ -100,8 +121,33 @@ table.shots td:first-child,table.shots th:first-child{text-align:left}
   <div class="note">Read-only view of the SEN calculator's profiles on this phone (same sprukk.github.io origin). The probe never writes to the calculator's storage and never creates it. Re-read whenever you come back to this app.</div>
 </div>
 
-<div id="devices"></div>
+</section>
 
+<section id="tab-capture" hidden>
+<div class="panel">
+  <h2>Capture session <span class="sp"></span><span id="capstat" style="text-transform:none;letter-spacing:0"></span></h2>
+  <div class="note" style="margin-top:0">For working out unknown data: records every notification, advert and read from the ticked devices, plus your markers for what you're physically doing. The table shows which bytes changed since the last marker. Never writes to a device.</div>
+  <div class="lbl">Devices</div>
+  <div id="capdevs"></div>
+  <div class="row" style="margin-top:8px">
+    <div><div class="lbl">Test</div><select id="cappreset"></select></div>
+    <div><div class="lbl">Session name</div><input id="capname" placeholder="e.g. FX angle test 1"></div>
+  </div>
+  <label class="ck"><input type="checkbox" id="cappoll"> Re-read every readable characteristic every 2 s (finds slow-changing values like temperature)</label>
+  <div class="row" style="margin-top:10px"><button class="primary" id="capstart" style="flex:1 1 auto">Start capture</button></div>
+  <div class="lbl">Markers — tap when the rifle / device is in that state</div>
+  <div class="steps" id="capmarks"></div>
+  <div class="row" style="margin-top:8px"><input id="capmarktxt" placeholder="Own marker, e.g. Rifle on bipod" maxlength="60"><button id="capmarkbtn">Mark</button></div>
+  <div class="row" style="margin-top:10px">
+    <button class="sm" id="capreadbtn">Read all now</button><button class="sm" id="capdumpbtn">GATT dump</button>
+    <span class="sp"></span><button class="sm" id="capsavebtn">Save .json</button><button class="sm" id="captxtbtn">Save .txt</button>
+  </div>
+  <div class="capwrap"><table class="capsum"><thead><tr><th>Device · characteristic</th><th>#</th><th>Last value (hex)</th><th>Since last marker</th></tr></thead><tbody id="capsum"></tbody></table></div>
+  <pre class="dump" id="capdump"></pre>
+</div>
+</section>
+
+<section id="tab-log" hidden>
 <!-- LOG -->
 <div class="panel">
   <h2>Timeline log <span class="sp"></span>
@@ -118,9 +164,15 @@ table.shots td:first-child,table.shots th:first-child{text-align:left}
   <div class="note"><span style="color:var(--green)">green</span> RX · <span style="color:var(--gold)">gold</span> TX / :WU wind · <span style="color:var(--violet)">violet</span> handshake · <span style="color:var(--pink)">pink</span> adverts / unhandled characteristics · <span style="color:var(--accent)">blue</span> decoded · <b style="color:#fff">white</b> shots. Save/Copy always exports every device, whatever the filter.</div>
 </div>
 
+</section>
+
+<nav class="tabbar" aria-label="Probe sections">
+  <button id="tb-devices" class="on">Devices</button><button id="tb-capture">Capture</button><button id="tb-log">Log</button><button id="tb-data">Data</button>
+</nav>
+
 <script>
 'use strict';
-const VERSION='1.2.0';
+const VERSION='1.3.0';
 const ISSC='49535343-fe7d-4ae5-8fa9-9fafd205e455';
 const NUS='6e400001-b5a3-f393-e0a9-e50e24dcca9e';
 const VRS='5445883a-3cab-42e5-b625-ca4e243f5a2c', VRS_VEL='5445883a-3cab-42e5-b625-ca4e243f5a2d', VRS_CMD='5445883a-3cab-42e5-b625-ca4e243f5a2e';
@@ -546,6 +598,7 @@ async function subscribe(d,c){
 }
 async function subscribeNeeded(d){for(const u of PROFILES[d.profile].need){const c=d.chars.get(u);if(c&&(c.properties.notify||c.properties.indicate))await subscribe(d,c);}}
 function onRx(d,u,b){
+  capRecord(d,'rx',shortU(u),b);
   const P=PROFILES[d.profile];
   if(!(P.quiet&&P.quiet(d,u,b)))log(d,'RX['+shortU(u)+'] ['+b.length+'B] '+hexOf(b)+'  "'+ascOf(b)+'"',P.need.includes(u)||(d.profile==='calypso'&&u===FFF2)?'rx':'other');
   if(P.rx)P.rx(d,u,b);
@@ -559,7 +612,7 @@ function removeDevice(d){
   if(PROFILES[d.profile].stop)PROFILES[d.profile].stop(d);
   try{if(d.dev.gatt.connected)d.dev.gatt.disconnect();}catch(e){}
   try{if(d.adCtl)d.adCtl.abort();}catch(e){}
-  d.ui.card.remove();DEVICES.splice(DEVICES.indexOf(d),1);refreshFilter();log(null,'Removed '+d.label+' ("'+d.name+'")');
+  d.ui.card.remove();DEVICES.splice(DEVICES.indexOf(d),1);refreshFilter();renderStrip();log(null,'Removed '+d.label+' ("'+d.name+'")');
 }
 async function watchAds(d){
   if(typeof d.dev.watchAdvertisements!=='function'){log(d,'watchAdvertisements() not supported in this browser (try chrome://flags → Experimental Web Platform features).','er');return;}
@@ -571,6 +624,7 @@ function onAdvert(d,ev){
   d.adSeen++;
   const parts=[];
   ev.manufacturerData&&ev.manufacturerData.forEach((v,id)=>{const b=new Uint8Array(v.buffer.slice(v.byteOffset,v.byteOffset+v.byteLength));parts.push('mfr 0x'+id.toString(16).padStart(4,'0')+' ['+hexOf(b)+']');
+    capRecord(d,'adv','mfr '+id.toString(16).padStart(4,'0'),b);
     if(id===0x0059&&parseFxBroadcast(b)){if(d.profile==='generic'&&!d.ui.profSel.dataset.manual){log(d,'FX Pocket broadcast detected: switching profile.','hl');setProfile(d,'fxbcast',true);}
       if(d.profile==='fxbcast')PROFILES.fxbcast.advert(d,b);}});
   ev.serviceData&&ev.serviceData.forEach((v,u)=>parts.push('svc '+shortU(u)+' ['+hexOf(new Uint8Array(v.buffer.slice(v.byteOffset,v.byteOffset+v.byteLength)))+']'));
@@ -579,7 +633,7 @@ function onAdvert(d,ev){
   if($('hideIdle').checked&&sig===d.lastAd)return;d.lastAd=sig;
   log(d,'ADV rssi='+ev.rssi+' '+(sig||'(no mfr/service data)')+(ev.uuids&&ev.uuids.length?' uuids='+ev.uuids.map(shortU).join(','):''),'other');
 }
-function setDot(d,cls,txt){d.ui.dot.className='dot '+cls;d.ui.status.textContent=txt;d.ui.connBtn.textContent=d.connected?'Disconnect':'Connect';}
+function setDot(d,cls,txt){d.ui.dot.className='dot '+cls;d.ui.status.textContent=txt;d.ui.connBtn.textContent=d.connected?'Disconnect':'Connect';renderStrip();}
 function setProfile(d,key,auto){
   if(PROFILES[d.profile].stop&&d.profile!==key)PROFILES[d.profile].stop(d);
   d.profile=key;d.ui.profSel.value=key;d.ui.profTag.textContent=PROFILES[key].name;
@@ -644,6 +698,130 @@ async function reconnectKnown(){
   for(const dev of list)await attach(dev,$('optGatt').checked);
 }
 
+/* ---------- tabs (V1.3.0) ----------
+   Sections of ONE page, never separate pages: Web Bluetooth connections drop when the page
+   changes, so devices stay connected whichever tab is showing. Remembered tab: localStorage
+   'sen_lab_tab' (Lab namespace, storage contract with Main). */
+const TABS=['devices','capture','log','data'];
+function showTab(t){
+  if(!TABS.includes(t))t='devices';
+  TABS.forEach(k=>{$('tab-'+k).hidden=k!==t;const b=$('tb-'+k);b.classList.toggle('on',k===t);b.setAttribute('aria-current',k===t?'page':'false');});
+  try{localStorage.setItem('sen_lab_tab',t);}catch(e){}
+  if(t==='log')$('log').scrollTop=$('log').scrollHeight;
+  if(t==='capture')capRefreshDevs();
+}
+function renderStrip(){
+  const s=$('strip');if(!s)return;s.textContent='';
+  if(!DEVICES.length){s.appendChild(el('span',{class:'note',style:'margin:0'},'No devices'));return;}
+  DEVICES.forEach(d=>s.appendChild(el('button',{class:'chip',style:'--c:'+d.color,onclick:()=>{showTab('devices');d.ui.card.scrollIntoView&&d.ui.card.scrollIntoView({block:'start'});}},
+    el('span',{class:'dot'+(d.connected?' on':'')}),d.label+(CAP.on?' ●':''))));
+}
+
+/* ---------- capture sessions (V1.3.0, LAB-03) ----------
+   Reverse-engineering aid: record EVERY notification (also the ones the log collapses), every
+   advert and on-demand reads from the chosen devices, with time-stamped markers for what you
+   are physically doing ("level", "pitch up ~10°"…). The summary shows, per characteristic,
+   which byte positions changed since the previous marker — the fields that follow a movement
+   stand out. Export: JSON (full) or text. Nothing is ever written to a device. */
+const CAP_PRESETS={
+  fxangle:{name:'FX angle test (LAB-03)',marks:['Level','Pitch up ~10°','Pitch down ~10°','Level','Cant left ~10°','Cant right ~10°','Level','Shot']},
+  env:{name:'Environment hunt (temp / humidity / pressure)',marks:['Indoors','Outdoors','Hand on chrono (warm)','Back indoors']},
+  free:{name:'Free (own markers only)',marks:[]}
+};
+const CAP={on:false,t0:0,name:'',preset:'fxangle',devs:[],events:[],markers:[],last:new Map(),atMark:new Map(),pollIv:null};
+function capT(){return Date.now()-CAP.t0;}
+function capKey(d,ch){return d.label+'|'+ch;}
+function capWanted(d){return CAP.on&&CAP.devs.includes(d.n);}
+function capRecord(d,kind,ch,b){
+  if(!capWanted(d))return;
+  const hex=hexOf(b);CAP.events.push({t:capT(),dev:d.label,kind,ch,hex,asc:ascOf(b)});
+  const k=capKey(d,ch),cur=CAP.last.get(k);CAP.last.set(k,{dev:d.label,ch,kind,n:(cur?cur.n:0)+1,hex,bytes:Array.from(b)});
+  if(CAP.events.length>200000)CAP.events.splice(0,CAP.events.length-200000);
+  capSummarySoon();
+}
+let capSumT=null;function capSummarySoon(){if(!capSumT)capSumT=setTimeout(()=>{capSumT=null;capRenderSummary();},250);}
+function capRefreshDevs(){
+  const box=$('capdevs');if(!box)return;box.textContent='';
+  if(!DEVICES.length){box.appendChild(el('div',{class:'note'},'Add a device on the Devices tab first.'));return;}
+  DEVICES.forEach(d=>{const cb=el('input',{type:'checkbox',checked:CAP.on?CAP.devs.includes(d.n):true,disabled:CAP.on});cb.dataset.n=d.n;
+    box.appendChild(el('label',{class:'ck'},cb,d.label+' · '+d.name+(d.connected?'':' (not connected)')));});
+}
+function capStart(){
+  if(CAP.on){capStop();return;}
+  CAP.devs=[...$('capdevs').querySelectorAll('input[type=checkbox]')].filter(c=>c.checked).map(c=>+c.dataset.n);
+  if(!CAP.devs.length){alert('Tick at least one device.');return;}
+  Object.assign(CAP,{on:true,t0:Date.now(),name:$('capname').value.trim()||CAP_PRESETS[$('cappreset').value].name,preset:$('cappreset').value,events:[],markers:[],last:new Map(),atMark:new Map()});
+  log(null,'Capture started: "'+CAP.name+'" on '+CAP.devs.map(n=>DEVICES.find(d=>d.n===n).label).join(', '),'hl');
+  if($('cappoll').checked)CAP.pollIv=setInterval(()=>capReadAll(true),2000);
+  capMark('Start');capRenderUI();
+}
+function capStop(){
+  if(CAP.pollIv){clearInterval(CAP.pollIv);CAP.pollIv=null;}
+  capMark('Stop');CAP.on=false;log(null,'Capture stopped: '+CAP.events.length+' events, '+CAP.markers.length+' markers.','hl');capRenderUI();
+}
+function capMark(text){
+  if(!CAP.on)return;text=String(text||'').trim().slice(0,60);if(!text)return;
+  CAP.markers.push({t:capT(),text});CAP.events.push({t:capT(),kind:'mark',text});
+  CAP.last.forEach((v,k)=>CAP.atMark.set(k,v.bytes.slice()));
+  log(null,'MARK "'+text+'"','hl');capRenderSummary();renderStrip();
+}
+// Byte positions of a characteristic that differ between its value at the latest marker and now.
+function capChanged(k,bytes){const base=CAP.atMark.get(k);if(!base)return null;
+  const out=[];for(let i=0;i<Math.max(base.length,bytes.length);i++)if(base[i]!==bytes[i])out.push(i);return out;}
+async function capReadAll(quiet){
+  for(const d of DEVICES.filter(x=>x.connected&&(!CAP.on||CAP.devs.includes(x.n)))){
+    for(const [u,c] of d.chars){if(!c.properties.read)continue;
+      try{const v=await enqueue(d,()=>c.readValue());const b=new Uint8Array(v.buffer.slice(v.byteOffset,v.byteOffset+v.byteLength));
+        capRecord(d,'read',shortU(u),b);if(!quiet)log(d,'READ '+shortU(u)+' = '+hexOf(b)+'  "'+ascOf(b)+'"','hl');}
+      catch(e){if(!quiet)log(d,'read '+shortU(u)+' failed: '+e.message,'er');}}
+  }
+}
+function capGattDump(){
+  const lines=[];
+  DEVICES.filter(d=>!CAP.on||CAP.devs.includes(d.n)).forEach(d=>{
+    lines.push(d.label+' "'+d.name+'" id='+d.dev.id+' profile='+d.profile+(d.connected?'':' (not connected)'));
+    const bySvc=new Map();d.chars.forEach((c,u)=>{const s=c.service.uuid.toLowerCase();if(!bySvc.has(s))bySvc.set(s,[]);bySvc.get(s).push([u,c]);});
+    d.svcs.forEach(s=>{lines.push('  SVC '+s);(bySvc.get(s)||[]).forEach(([u,c])=>{const p=c.properties,pr=['read','write','writeWithoutResponse','notify','indicate'].filter(k=>p[k]);
+      lines.push('    CHR '+u+' ['+pr.join(', ')+']'+(d.subscribed.has(u)?' subscribed':''));});});
+  });
+  const txt=lines.join('\n')||'No devices.';$('capdump').textContent=txt;
+  if(CAP.on)CAP.events.push({t:capT(),kind:'gatt',text:txt});
+  return txt;
+}
+function capRenderSummary(){
+  const tb=$('capsum');if(!tb)return;tb.textContent='';
+  const rows=[...CAP.last.entries()].sort((a,b)=>a[0]<b[0]?-1:1);
+  if(!rows.length){tb.appendChild(el('tr',null,el('td',{colSpan:4},CAP.on?'Waiting for data…':'No capture yet.')));return;}
+  rows.forEach(([k,v])=>{const ch=capChanged(k,v.bytes);
+    tb.appendChild(el('tr',null,el('td',null,v.dev+' '+v.ch+(v.kind==='read'?' (read)':v.kind==='adv'?' (adv)':'')),el('td',null,String(v.n)),
+      el('td',{class:'hexcell'},v.hex),el('td',{class:ch&&ch.length?'chg':''},ch==null?'—':ch.length?'bytes '+ch.join(','):'same')));});
+  $('capstat').textContent=CAP.on?('Recording "'+CAP.name+'" · '+CAP.events.length+' events · '+CAP.markers.length+' markers · '+Math.round(capT()/1000)+' s'):(CAP.events.length?'Stopped · '+CAP.events.length+' events · '+CAP.markers.length+' markers — export below':'');
+}
+function capRenderUI(){
+  $('capstart').textContent=CAP.on?'Stop capture':'Start capture';$('capstart').className=CAP.on?'warn':'primary';
+  ['cappreset','capname','cappoll'].forEach(id=>$(id).disabled=CAP.on);
+  const mk=$('capmarks');mk.textContent='';
+  (CAP_PRESETS[$('cappreset').value]||CAP_PRESETS.free).marks.forEach(m=>mk.appendChild(el('button',{disabled:!CAP.on,onclick:()=>capMark(m)},m)));
+  $('capmarkbtn').disabled=!CAP.on;$('capsavebtn').disabled=$('captxtbtn').disabled=!CAP.events.length;
+  capRefreshDevs();capRenderSummary();renderStrip();
+}
+function capSession(){
+  return{app:'SEN BLE Probe',version:VERSION,session:CAP.name,preset:CAP.preset,startedAt:new Date(CAP.t0).toISOString(),userAgent:navigator.userAgent,
+    devices:DEVICES.filter(d=>CAP.devs.includes(d.n)).map(d=>({label:d.label,name:d.name,id:d.dev.id,profile:d.profile,
+      services:[...d.svcs],characteristics:[...d.chars].map(([u,c])=>({uuid:u,service:c.service.uuid.toLowerCase(),props:['read','write','writeWithoutResponse','notify','indicate'].filter(k=>c.properties[k])}))})),
+    markers:CAP.markers,events:CAP.events};
+}
+function capText(){
+  const s=capSession(),f=t=>(t/1000).toFixed(3).padStart(9);
+  return['SEN BLE Probe V'+VERSION+' capture "'+s.session+'" '+s.startedAt,...s.devices.map(d=>d.label+' = "'+d.name+'" '+d.profile),'',
+    ...s.events.map(e=>e.kind==='mark'?f(e.t)+'  ===== '+e.text+' =====':e.kind==='gatt'?f(e.t)+'  GATT\n'+e.text:f(e.t)+'  '+e.dev+' '+e.kind+' '+e.ch+' ['+e.hex+']  "'+e.asc+'"')].join('\n');
+}
+function capDownload(json){
+  const stamp=new Date(CAP.t0||Date.now()).toISOString().replace(/[:.]/g,'-');
+  const a=el('a',{href:URL.createObjectURL(new Blob([json?JSON.stringify(capSession(),null,1):capText()],{type:json?'application/json':'text/plain'})),download:'sen-capture-'+stamp+(json?'.json':'.txt')});
+  document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);
+}
+
 /* ---------- capabilities ---------- */
 const CAPS=[];
 async function checkCaps(){
@@ -675,6 +853,18 @@ setInterval(()=>DEVICES.forEach(d=>{if(d.profile==='calypso')calTag(d);}),1000);
 $('mainbtn').addEventListener('click',loadMain);
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')loadMain();});
 loadMain();
+TABS.forEach(t=>$('tb-'+t).addEventListener('click',()=>showTab(t)));
+for(const k in CAP_PRESETS)$('cappreset').appendChild(el('option',{value:k},CAP_PRESETS[k].name));
+$('cappreset').addEventListener('change',capRenderUI);
+$('capstart').addEventListener('click',capStart);
+$('capmarkbtn').addEventListener('click',()=>{capMark($('capmarktxt').value);$('capmarktxt').value='';});
+$('capmarktxt').addEventListener('keydown',e=>{if(e.key==='Enter'){capMark($('capmarktxt').value);$('capmarktxt').value='';}});
+$('capreadbtn').addEventListener('click',()=>capReadAll(false));
+$('capdumpbtn').addEventListener('click',capGattDump);
+$('capsavebtn').addEventListener('click',()=>capDownload(true));
+$('captxtbtn').addEventListener('click',()=>capDownload(false));
+capRenderUI();
+{let t='devices';try{t=localStorage.getItem('sen_lab_tab')||t;}catch(e){}showTab(t);}
 checkCaps().then(()=>log(null,'SEN BLE Probe V'+VERSION+' ready. '+CAPS.join(' · ')));
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(e=>log(null,'Service worker not registered: '+e.message,'er'));
 </script>
