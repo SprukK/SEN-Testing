@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#0a0c0f">
-<title>SEN BLE Probe V1.3.0</title>
+<title>SEN BLE Probe V1.3.1</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="probe-icon-192.png">
 <link rel="apple-touch-icon" href="probe-icon-192.png">
@@ -83,7 +83,7 @@ pre.dump{font-size:10px;white-space:pre-wrap;word-break:break-all;color:var(--te
 </style>
 </head>
 <body>
-<h1>SEN · BLE Probe <span style="font-size:11px;color:var(--text3)">V1.3.0</span></h1>
+<h1>SEN · BLE Probe <span style="font-size:11px;color:var(--text3)">V1.3.1</span></h1>
 <div class="sub">Multi-device BLE diagnostic for the SEN platform. Device profiles: Calypso Mini (wind), FX Pocket Pro (chrono, GATT), FX True Ballistic (radar, GATT), FX Pocket V2/D1 (chrono, broadcast), Generic (anything else, e.g. a rangefinder). Chrome on Android or desktop, HTTPS only.</div>
 <div class="strip" id="strip" aria-label="Devices"></div>
 
@@ -172,7 +172,7 @@ pre.dump{font-size:10px;white-space:pre-wrap;word-break:break-all;color:var(--te
 
 <script>
 'use strict';
-const VERSION='1.3.0';
+const VERSION='1.3.1';
 const ISSC='49535343-fe7d-4ae5-8fa9-9fafd205e455';
 const NUS='6e400001-b5a3-f393-e0a9-e50e24dcca9e';
 const VRS='5445883a-3cab-42e5-b625-ca4e243f5a2c', VRS_VEL='5445883a-3cab-42e5-b625-ca4e243f5a2d', VRS_CMD='5445883a-3cab-42e5-b625-ca4e243f5a2e';
@@ -181,7 +181,10 @@ const FFF1='0000fff1-0000-1000-8000-00805f9b34fb', FFF2='0000fff2-0000-1000-8000
 const BASE_SVCS=[ISSC,NUS,VRS,TB,0xFFF0,0xFFE0,0xFFE5,0xFFB0,0xFFD0,0xFEE7,0xFE59,0x180F,0x180A,0x1800,0x1801,0x181A,0x1530];
 const BASE_MFR=[0x0059];
 const FX_BCAST_UUID={'5765fdce':'V2','5765fdcd':'D1'};
-const HANDSHAKE=[':DU,1668647648,A7',':GK',':PS,1,1,9F',':WU,5',':WU,6',':VR'];
+/* :DU unlock token per unit, captured from Anemotracker (HCI snoop 2026-10-26). Fixed per device, not a clock:
+   until its own token is :AK'd the unit answers :NA to :CC and never streams :WU. New unit = one snoop capture. */
+const CAL_UNLOCK={'WDOT-B1F9A6':':DU,1668647648,A7','WDOT-E2896A':':DU,1802347072,AF'};
+const HANDSHAKE=[':GK',':PS,1,1,9F',':WU,5',':WU,6',':VR']; // sent after the :DU unlock
 const KEEPALIVE=':CC,6,86';
 const COLORS=['#7eb8c4','#c8a96e','#d9b3ff','#7ab87a','#ff9ed8','#e07a5f','#9fb4ff','#e6d36b'];
 const NAMES={[FFF1]:'FFF1 cmd',[FFF2]:'FFF2 data',[BATT]:'2A19 batt',[VRS_VEL]:'VRS velocity',[VRS_CMD]:'VRS cmd',[TB_SHOT]:'TB shot',[TB_BATT]:'TB batt',[TB_3P]:'TB 3rd-party',[TB_STREAM]:'TB stream','00001625-88ec-688c-644b-3fa706c0bb76':'TB cmd'};
@@ -380,7 +383,7 @@ const PROFILES={
       const kab=el('button',{style:'flex:1 1 auto',onclick:()=>d.st.ka?calStopKa(d):calStartKa(d)},'Start :CC keepalive');
       box.appendChild(el('div',{class:'row',style:'margin-top:10px'},el('button',{class:'gold',style:'flex:1 1 auto',onclick:()=>calHandshake(d)},'Send full handshake'),kab));
       const steps=el('div',{class:'steps'});
-      [...HANDSHAKE,KEEPALIVE].forEach((s,i)=>{const b=el('button',{onclick:()=>calSend(d,s,b,'(manual step)',true)},(i+1)+' '+s);steps.appendChild(b);});
+      [calToken(d)||Object.values(CAL_UNLOCK)[0],...HANDSHAKE,KEEPALIVE].forEach((s,i)=>{const b=el('button',{onclick:()=>calSend(d,s,b,'(manual step)',true)},(i+1)+' '+s);steps.appendChild(b);});
       box.appendChild(el('div',{class:'lbl'},'Step by step, a few seconds apart: green = real data back within 1.5 s, orange = silence'));
       box.appendChild(steps);
       d.ui.cal={t,kab,steps};
@@ -482,8 +485,8 @@ function calSentence(d,s){
     const f=s.split(',');if(f.length>=3)calGK(d,f[1],f[2]);else{d.st.pendingGK=f[1]||'';}
   }else if(d.st.pendingGK!=null&&s.startsWith(',')){calGK(d,d.st.pendingGK,s.slice(1).trim());d.st.pendingGK=null;}
   else if(s.startsWith(':VR')){const f=s.split(',');if(t)t.fw.v.textContent=(f[1]||'?').trim()+' '+(f[2]||'').trim();log(d,'  → '+s,'hl');}
-  else if(s.startsWith(':AK')){calBump(d,'ak');log(d,'  → :AK','hl');}
-  else if(s.startsWith(':NA')){calBump(d,'na');calTag(d);log(d,'  → :NA  (command REJECTED'+(d.st.lastTx?' — last TX '+d.st.lastTx:'')+')','er');}
+  else if(s.startsWith(':AK')){d.st.reply='AK';calBump(d,'ak');log(d,'  → :AK','hl');}
+  else if(s.startsWith(':NA')){d.st.reply='NA';calBump(d,'na');calTag(d);log(d,'  → :NA  (command REJECTED'+(d.st.lastTx?' — last TX '+d.st.lastTx:'')+')','er');}
   else if(s.startsWith(':CC')){log(d,'  → '+s);}
   else log(d,'  → UNKNOWN: '+s,'hl');
 }
@@ -499,9 +502,22 @@ async function calSend(d,s,btn,why,watch){
 async function calHandshake(d){
   log(d,'=== HANDSHAKE START ===','hs');
   const btns=d.ui.cal?d.ui.cal.steps.querySelectorAll('button'):[];
-  for(let i=0;i<HANDSHAKE.length;i++){await calSend(d,HANDSHAKE[i],btns[i],'('+(i+1)+'/'+HANDSHAKE.length+')');await sleep(120);}
-  await calSend(d,KEEPALIVE,btns[HANDSHAKE.length],'(initial)');
+  await calUnlock(d,btns[0]);await sleep(120);
+  for(let i=0;i<HANDSHAKE.length;i++){await calSend(d,HANDSHAKE[i],btns[i+1],'('+(i+2)+'/'+(HANDSHAKE.length+1)+')');await sleep(120);}
+  await calSend(d,KEEPALIVE,btns[HANDSHAKE.length+1],'(initial)');
   log(d,'=== HANDSHAKE SENT ===','hs');calStartKa(d);
+}
+function calToken(d){return CAL_UNLOCK[(d.name||'').toUpperCase()]||null;}
+async function calUnlock(d,btn){ // this unit's token first, then every other known token until one is :AK'd
+  const own=calToken(d),all=Object.values(CAL_UNLOCK);
+  for(const tok of own?[own,...all.filter(t=>t!==own)]:all){
+    d.st.reply=null;
+    await calSend(d,tok,btn,own===tok?'(1/6 unlock: this unit)':'(1/6 unlock: trying known token)');
+    const t0=Date.now();while(!d.st.reply&&Date.now()-t0<800)await sleep(40);
+    if(d.st.reply==='AK'){log(d,'Unlocked with '+tok+(own===tok?'':' (not this unit\'s listed token: add "'+d.name+'" to CAL_UNLOCK)'),'hl');return tok;}
+  }
+  log(d,'No known :DU token unlocks "'+d.name+'". Capture it once: Anemotracker + HCI snoop, take the :DU from its FFF1 writes.','er');
+  return null;
 }
 function calStartKa(d){
   if(d.st.ka)return;d.st.ka=setInterval(()=>{if(d.connected)calSend(d,KEEPALIVE,null,'(keepalive)');},10000);
@@ -572,7 +588,9 @@ async function discover(d){
     const su=svc.uuid.toLowerCase();d.svcs.add(su);
     box.appendChild(el('div',{class:'svc'},su));log(d,'SVC '+su,'hl');
     let chars=[];
-    try{chars=await svc.getCharacteristics();}catch(e){box.appendChild(el('div',{class:'chr'},'(no characteristics exposed)'));log(d,'  no chars: '+e.message);continue;}
+    try{chars=await svc.getCharacteristics();
+      if(!chars.length){await sleep(300);chars=await svc.getCharacteristics();log(d,'  (empty on first try, retried: '+chars.length+' char(s))');}
+    }catch(e){box.appendChild(el('div',{class:'chr'},'(no characteristics exposed)'));log(d,'  no chars: '+e.message);continue;}
     for(const c of chars){
       const u=c.uuid.toLowerCase(),p=c.properties,props=[];
       if(p.read)props.push('read');if(p.write)props.push('write');if(p.writeWithoutResponse)props.push('writeNR');if(p.notify)props.push('notify');if(p.indicate)props.push('indicate');

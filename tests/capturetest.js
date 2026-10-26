@@ -92,7 +92,7 @@ const nEv=w.eval('CAP.events.length');ang.emit([1,2,3,4]);await sleep(50);
 chk('stop: no more recording, markers disabled',w.eval('CAP.events.length')===nEv&&[...d.querySelectorAll('#capmarks button')].every(b=>b.disabled)&&!/●/.test(strip()[0]));
 click($('capsavebtn'));await sleep(20);
 const js=JSON.parse(await blobText(w.downloads[w.downloads.length-1]));
-chk('JSON export: session, device with services/characteristics, markers in order, events',js.session==='FX angle test 1'&&js.version==='1.3.0'&&js.devices.length===1&&js.devices[0].characteristics.length===4&&
+chk('JSON export: session, device with services/characteristics, markers in order, events',js.session==='FX angle test 1'&&js.version===w.eval('VERSION')&&js.devices.length===1&&js.devices[0].characteristics.length===4&&
   js.markers.map(m=>m.text).join('|')==='Start|Level|Pitch up ~10°|Rifle on bipod|Stop'&&js.events.some(e=>e.kind==='rx'&&e.hex==='e8 03 10 27')&&/^sen-capture-.*\.json$/.test(w.lastDownload),js.markers.map(m=>m.text).join('|'));
 click($('captxtbtn'));await sleep(20);
 const tx=await blobText(w.downloads[w.downloads.length-1]);

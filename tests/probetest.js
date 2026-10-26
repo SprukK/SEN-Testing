@@ -17,10 +17,11 @@ function mkDev(name,id,svcDefs){
   dev.gatt={connected:false,async connect(){this.connected=true;return {getPrimaryServices:async()=>svcs}},disconnect(){this.connected=false;dev.fire('gattserverdisconnected')}};
   return dev;
 }
+const TOKEN={'WDOT-B1F9A6':':DU,1668647648,A7'};
 function calypso(name,id,good){
   let d;const ISSC='49535343-fe7d-4ae5-8fa9-9fafd205e455';
   const onWrite=s=>{const n=d.char('0000fff2'+B);const em=x=>setTimeout(()=>n.emit(enc(x)),20);
-    if(s.startsWith(':DU'))em(good?':AK\r':':NA\r');
+    if(s.startsWith(':DU'))em(good&&s.startsWith(TOKEN[name])?':AK\r':':NA\r');
     if(s.startsWith(':GK')){em(':GK,'+(good?'496042832':'1117338552')+'\r');setTimeout(()=>n.emit(enc(good?',85\r':',BD\r')),40);}
     if(s.startsWith(':PS')){em(':AK\r');if(good)d.stream=true;}
     if(s.startsWith(':CC'))em(good?':CC,6,0,----,B6\r':':NA\r');
@@ -32,7 +33,7 @@ function calypso(name,id,good){
 const VRS='5445883a-3cab-42e5-b625-ca4e243f5a2c';
 const devs={
   A:calypso('WDOT-B1F9A6','idA',true),
-  B:calypso('WDOT-E2896A','idB',false),
+  B:calypso('WDOT-0A0A0A','idB',false), // unknown unit: no known :DU token works
   P:mkDev('FX Pocket Pro 1234','idP',[{uuid:VRS,chars:[{uuid:'5445883a-3cab-42e5-b625-ca4e243f5a2d',props:{notify:true}},{uuid:'5445883a-3cab-42e5-b625-ca4e243f5a2e',props:{write:true}}]}]),
   T:mkDev('vXfS3c6kXYZ','idT',[{uuid:'00001623-88ec-688c-644b-3fa706c0bb76',chars:[{uuid:'00001624-88ec-688c-644b-3fa706c0bb76',props:{notify:true}},{uuid:'0000162b-88ec-688c-644b-3fa706c0bb76',props:{read:true,notify:true},read:enc('Boot')}]}]),
   V:mkDev(undefined,'idV',[]),
@@ -106,6 +107,6 @@ const tileVal=(card,label)=>{const t=[...card.querySelectorAll('.sc')].find(s=>s
   // remove T
   click([...cT.querySelectorAll('button')].find(b=>b.textContent==='Remove'));await sleep(50);ok(cards().length===5,'remove T');
   // export
-  const txt=w.eval('exportText()');ok(txt.includes('D2 = "WDOT-E2896A" profile=calypso')&&txt.includes('SHOT #4'),'export has device table + shots');
+  const txt=w.eval('exportText()');ok(txt.includes('D2 = "WDOT-0A0A0A" profile=calypso')&&txt.includes('SHOT #4'),'export has device table + shots');
   console.log(fails?`\n${fails} FAILED`:'\nALL PASS');process.exit(fails?1:0);
 })().catch(e=>{console.error(e);process.exit(1)});
