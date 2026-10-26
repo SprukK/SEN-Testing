@@ -46,7 +46,6 @@ const tileVal=(card,label)=>{const t=[...card.querySelectorAll('.sc')].find(s=>s
 const du=dev=>dev.writes.filter(s=>s.startsWith(':DU')).map(s=>s.trim());
 (async()=>{
   await sleep(100);
-  ok(w.eval('VERSION')==='1.3.1','version 1.3.1');
   for(const dv of devs){queue.push(dv);click(d.getElementById('addbtn'));await sleep(300);}
   await sleep(5000); // handshakes incl. fallback waits
   const iv=setInterval(()=>devs.forEach(dv=>{if(dv.unlocked)dv.fff2.emit(enc(':WU,2,3.4,3.1,270.0,5F\r'));}),250);

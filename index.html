@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#0a0c0f">
-<title>SEN BLE Probe V1.3.1</title>
+<title>SEN BLE Probe V1.4.0</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="probe-icon-192.png">
 <link rel="apple-touch-icon" href="probe-icon-192.png">
@@ -79,11 +79,15 @@ table.capsum td{padding:4px 5px;border-bottom:1px solid rgba(255,255,255,.04);co
 table.capsum td.hexcell{word-break:break-all;color:var(--text)}
 table.capsum td.chg{color:var(--gold);font-weight:600}
 .capwrap{max-height:340px;overflow:auto}
+/* V1.4.0 wind lane */
+#lanewrap{width:100%;margin-top:10px}
+#lanecv{display:block;width:100%;border-radius:8px;touch-action:pan-y}
+input[type=range]{min-height:32px;padding:0}
 pre.dump{font-size:10px;white-space:pre-wrap;word-break:break-all;color:var(--text2);margin-top:8px}
 </style>
 </head>
 <body>
-<h1>SEN · BLE Probe <span style="font-size:11px;color:var(--text3)">V1.3.1</span></h1>
+<h1>SEN · BLE Probe <span style="font-size:11px;color:var(--text3)">V1.4.0</span></h1>
 <div class="sub">Multi-device BLE diagnostic for the SEN platform. Device profiles: Calypso Mini (wind), FX Pocket Pro (chrono, GATT), FX True Ballistic (radar, GATT), FX Pocket V2/D1 (chrono, broadcast), Generic (anything else, e.g. a rangefinder). Chrome on Android or desktop, HTTPS only.</div>
 <div class="strip" id="strip" aria-label="Devices"></div>
 
@@ -147,6 +151,32 @@ pre.dump{font-size:10px;white-space:pre-wrap;word-break:break-all;color:var(--te
 </div>
 </section>
 
+<section id="tab-lane" hidden>
+<div class="panel">
+  <h2>Wind lane <span class="sp"></span><span class="tag idle">illustrative · not dope</span></h2>
+  <div class="row">
+    <div><div class="lbl">Lane length m</div><input type="number" id="lnLen" min="10" max="1000" step="5"></div>
+    <div><div class="lbl">Between stations</div><select id="lnMode"><option value="nearest">Nearest station</option><option value="blend">Blend (linear)</option></select></div>
+  </div>
+  <div class="row">
+    <div><div class="lbl">MV m/s</div><input type="number" id="lnMv" min="50" max="400" step="1"></div>
+    <div><div class="lbl">BC G7 lb/in²</div><input type="number" id="lnBc" min="0.02" max="0.5" step="0.001"></div>
+  </div>
+  <div id="lanewrap"><canvas id="lanecv" aria-label="Top-down shooting lane with wind stations and bullet path"></canvas></div>
+  <div class="scs">
+    <div class="sc"><div class="l">Drift at target</div><div class="v" id="lnDrift">—</div><div class="u">mm</div></div>
+    <div class="sc"><div class="l">Drift</div><div class="v" id="lnMoa">—</div><div class="u">MOA</div></div>
+    <div class="sc"><div class="l">Drift</div><div class="v" id="lnMrad">—</div><div class="u">mrad</div></div>
+    <div class="sc"><div class="l">Time of flight</div><div class="v" id="lnTof">—</div><div class="u">ms</div></div>
+    <div class="sc"><div class="l" id="lnSn0">S1 share</div><div class="v" id="lnS0">—</div><div class="u">mm, others calm</div></div>
+    <div class="sc"><div class="l" id="lnSn1">S2 share</div><div class="v" id="lnS1">—</div><div class="u">mm, others calm</div></div>
+  </div>
+  <div class="note" id="lnState"></div>
+  <div class="note">Top view: firing point at the bottom, target at the top, distances to scale, sideways drift exaggerated (factor shown on the picture). The gold line is the bullet's sideways path; each station's wind applies to its shaded part of the lane (<b>Nearest</b>) or fades into the next station's (<b>Blend</b>). Station wind = direction it comes FROM, clockwise from the mark, mark pointed at the target (0° head, 90° from the right), as the Calypso reports and the calculator uses. Live Calypsos feed their rolling average. Physics: the calculator's G7 drag (V1.24.2) on the bullet's speed relative to the local wind, Ljubljana default air. <b>Illustrative only:</b> the multi-station model is not verified (CORE-17), there's no scope, zero or gravity here — don't dial from it.</div>
+</div>
+<div id="lanest"></div>
+</section>
+
 <section id="tab-log" hidden>
 <!-- LOG -->
 <div class="panel">
@@ -167,12 +197,12 @@ pre.dump{font-size:10px;white-space:pre-wrap;word-break:break-all;color:var(--te
 </section>
 
 <nav class="tabbar" aria-label="Probe sections">
-  <button id="tb-devices" class="on">Devices</button><button id="tb-capture">Capture</button><button id="tb-log">Log</button><button id="tb-data">Data</button>
+  <button id="tb-devices" class="on">Devices</button><button id="tb-capture">Capture</button><button id="tb-lane">Lane</button><button id="tb-log">Log</button><button id="tb-data">Data</button>
 </nav>
 
 <script>
 'use strict';
-const VERSION='1.3.1';
+const VERSION='1.4.0';
 const ISSC='49535343-fe7d-4ae5-8fa9-9fafd205e455';
 const NUS='6e400001-b5a3-f393-e0a9-e50e24dcca9e';
 const VRS='5445883a-3cab-42e5-b625-ca4e243f5a2c', VRS_VEL='5445883a-3cab-42e5-b625-ca4e243f5a2d', VRS_CMD='5445883a-3cab-42e5-b625-ca4e243f5a2e';
@@ -478,7 +508,7 @@ function calSentence(d,s){
     const f=s.split(',');
     if(f.length>=5&&f[1]==='2'){
       if(t){t.spd.v.textContent=parseFloat(f[2]).toFixed(1);t.avg.v.textContent=parseFloat(f[3]).toFixed(1);t.dir.v.textContent=Math.round(parseFloat(f[4]));}
-      d.st.lastWu=Date.now();calBump(d,'wu');calTag(d);
+      d.st.lastWu=Date.now();d.st.wind={avg:parseFloat(f[3]),dir:parseFloat(f[4]),t:d.st.lastWu};calBump(d,'wu');calTag(d);
       log(d,'  → :WU inst='+f[2]+' avg='+f[3]+' dir='+f[4]+' ('+f.length+' fields)','wu');
     }else log(d,'  → :WU non-standard ('+f.length+' fields): '+s,'hl');
   }else if(s.startsWith(':GK')){
@@ -720,19 +750,231 @@ async function reconnectKnown(){
    Sections of ONE page, never separate pages: Web Bluetooth connections drop when the page
    changes, so devices stay connected whichever tab is showing. Remembered tab: localStorage
    'sen_lab_tab' (Lab namespace, storage contract with Main). */
-const TABS=['devices','capture','log','data'];
+const TABS=['devices','capture','lane','log','data'];
 function showTab(t){
   if(!TABS.includes(t))t='devices';
   TABS.forEach(k=>{$('tab-'+k).hidden=k!==t;const b=$('tb-'+k);b.classList.toggle('on',k===t);b.setAttribute('aria-current',k===t?'page':'false');});
   try{localStorage.setItem('sen_lab_tab',t);}catch(e){}
   if(t==='log')$('log').scrollTop=$('log').scrollHeight;
   if(t==='capture')capRefreshDevs();
+  if(t==='lane')laneStart();else laneStop();
 }
 function renderStrip(){
   const s=$('strip');if(!s)return;s.textContent='';
   if(!DEVICES.length){s.appendChild(el('span',{class:'note',style:'margin:0'},'No devices'));return;}
   DEVICES.forEach(d=>s.appendChild(el('button',{class:'chip',style:'--c:'+d.color,onclick:()=>{showTab('devices');d.ui.card.scrollIntoView&&d.ui.card.scrollIntoView({block:'start'});}},
     el('span',{class:'dot'+(d.connected?' on':'')}),d.label+(CAP.on?' ●':''))));
+}
+
+/* ---------- wind lane (V1.4.0, CORE-17 preview) ----------
+   Top-down lane: firing point at the bottom, target at the top, wind stations beside it, and the
+   bullet's sideways path bent by each station's wind. ILLUSTRATIVE, NOT DOPE.
+   Physics: point-mass RK4 on the velocity RELATIVE to the local wind (x downrange, y right), with
+   the drag form and G7 table copied from Main V1.24.2 (a = (π/8)·ρ·v·Cd/BC_si · v_rel, verified
+   there against py-ballisticcalc). Fixed Ljubljana-default air; no gravity or zero (top view only).
+   The multi-station wind model itself (nearest / blend) is NOT §20A-verified: that is CORE-17.
+   Wind convention as the Calypso and Main: direction the wind comes FROM, clockwise from the
+   station's mark, mark pointed at the target (0° headwind, 90° from the right). */
+const LANE_G7=[[0,0.1198],[0.05,0.1197],[0.1,0.1196],[0.15,0.1194],[0.2,0.1193],[0.25,0.1194],[0.3,0.1194],[0.35,0.1194],[0.4,0.1193],[0.45,0.1193],[0.5,0.1194],[0.55,0.1193],[0.6,0.1194],[0.65,0.1197],[0.7,0.1202],[0.725,0.1207],[0.75,0.1215],[0.775,0.1226],[0.8,0.1242],[0.825,0.1266],[0.85,0.1306],[0.875,0.1368],[0.9,0.1464],[0.925,0.166],[0.95,0.2054],[0.975,0.2993],[1,0.3803],[1.025,0.4015],[1.05,0.4043],[1.075,0.4034],[1.1,0.4014]];
+const LANE_RHO=1.1934,LANE_AS=343.24,LANE_LB2KG=703.07; // Ljubljana default air (V7 §3–6); §9H BC conversion
+const LANE_COL=['#7eb8c4','#d9b3ff'];
+const LANE_DEF={len:100,mv:280,bc:0.128,mode:'nearest',st:[
+  {name:'S1',side:'L',pct:10,src:'manual',spd:3,dir:90,gust:true},
+  {name:'S2',side:'R',pct:60,src:'manual',spd:4,dir:60,gust:true}]};
+const clampN=(v,lo,hi,d)=>{v=+v;return Number.isFinite(v)?Math.min(hi,Math.max(lo,v)):d;};
+function laneClean(j){ // whitelist + clamp anything read back from storage
+  const D=LANE_DEF,o={len:clampN(j.len,10,1000,D.len),mv:clampN(j.mv,50,400,D.mv),bc:clampN(j.bc,0.02,0.5,D.bc),mode:j.mode==='blend'?'blend':'nearest',st:[]};
+  for(let i=0;i<2;i++){const s=(Array.isArray(j.st)&&j.st[i])||{},d=D.st[i];
+    o.st.push({name:String(s.name||d.name).slice(0,16),side:s.side==='R'?'R':s.side==='L'?'L':d.side,pct:clampN(s.pct,1,99,d.pct),
+      src:typeof s.src==='string'?s.src:'manual',spd:clampN(s.spd,0,30,d.spd),dir:clampN(s.dir,0,359,d.dir),gust:s.gust==null?d.gust:!!s.gust});}
+  return o;
+}
+let LANE=laneClean({});
+try{const j=JSON.parse(localStorage.getItem('sen_lab_lane')||'null');if(j&&typeof j==='object')LANE=laneClean(j);}catch(e){}
+function laneSave(){try{localStorage.setItem('sen_lab_lane',JSON.stringify(LANE));}catch(e){}}
+function laneInterp(T,m){if(m<=T[0][0])return T[0][1];for(let i=1;i<T.length;i++)if(m<=T[i][0]){const[a,b]=[T[i-1],T[i]];return a[1]+(b[1]-a[1])*(m-a[0])/(b[0]-a[0]);}return T[T.length-1][1];}
+
+/* station wind now: live Calypso (rolling average, as Main uses) or manual (+ optional gusts) */
+function laneStationWind(s,i,now){
+  if(s.src!=='manual'){
+    const d=DEVICES.find(x=>String(x.n)===s.src),w=d&&d.st.wind;
+    if(d&&d.connected&&w&&now-w.t<3000)return{spd:w.avg,dir:w.dir,state:'LIVE '+d.label};
+    return{spd:0,dir:0,state:'LOST '+(d?d.label:'device')};
+  }
+  if(!s.gust)return{spd:s.spd,dir:s.dir,state:'MANUAL'};
+  const k=now/1000,ph=i*2.1;
+  return{spd:Math.max(0,s.spd*(1+0.35*Math.sin(k*0.9+ph)+0.15*Math.sin(k*2.3+ph*1.7))),dir:(s.dir+12*Math.sin(k*0.5+ph)+360)%360,state:'MANUAL · gusts'};
+}
+const laneVec=(spd,dir)=>{const r=dir*Math.PI/180;return[-spd*Math.cos(r),-spd*Math.sin(r)];}; // wind velocity (x downrange, y right)
+/* wind field along the lane from stations [{x,wx,wy}]: nearest station, or linear blend between them */
+function laneField(sts,mode){
+  const s=[...sts].sort((a,b)=>a.x-b.x);
+  return x=>{
+    if(mode==='blend'){
+      if(x<=s[0].x)return[s[0].wx,s[0].wy];
+      for(let i=1;i<s.length;i++)if(x<=s[i].x){const a=s[i-1],b=s[i],f=(x-a.x)/(b.x-a.x);return[a.wx+(b.wx-a.wx)*f,a.wy+(b.wy-a.wy)*f];}
+      const l=s[s.length-1];return[l.wx,l.wy];
+    }
+    let best=s[0];for(const t of s)if(Math.abs(x-t.x)<Math.abs(x-best.x))best=t;return[best.wx,best.wy];
+  };
+}
+/* RK4 in time; returns sideways offset y at the target, time of flight and the path [x,y,t] */
+function laneSolve(field,len,mv,bc){
+  const bcSi=bc*LANE_LB2KG,h=0.0005;
+  const der=(x,vx,vy)=>{const[wx,wy]=field(x),rx=vx-wx,ry=vy-wy,v=Math.hypot(rx,ry),k=Math.PI/8*LANE_RHO*v*laneInterp(LANE_G7,v/LANE_AS)/bcSi;return[vx,vy,-k*rx,-k*ry];};
+  let x=0,y=0,vx=mv,vy=0,t=0,n=0;const path=[[0,0,0]];let rec=len/150;
+  while(x<len&&n++<4e5&&vx>1){
+    const a=der(x,vx,vy),b=der(x+h/2*a[0],vx+h/2*a[2],vy+h/2*a[3]),c=der(x+h/2*b[0],vx+h/2*b[2],vy+h/2*b[3]),d=der(x+h*c[0],vx+h*c[2],vy+h*c[3]);
+    const nx=x+h/6*(a[0]+2*b[0]+2*c[0]+d[0]),ny=y+h/6*(a[1]+2*b[1]+2*c[1]+d[1]);
+    if(nx>=len){const f=(len-x)/(nx-x);y+=f*(ny-y);t+=f*h;x=len;path.push([x,y,t]);break;}
+    vx+=h/6*(a[2]+2*b[2]+2*c[2]+d[2]);vy+=h/6*(a[3]+2*b[3]+2*c[3]+d[3]);x=nx;y=ny;t+=h;
+    if(x>=rec){path.push([x,y,t]);rec+=len/150;}
+  }
+  return{y,t,path};
+}
+/* everything the view needs for this moment */
+function laneCompute(now){
+  const sw=LANE.st.map((s,i)=>Object.assign(laneStationWind(s,i,now),{x:s.pct/100*LANE.len}));
+  const sts=sw.map(w=>{const[wx,wy]=laneVec(w.spd,w.dir);return{x:w.x,wx,wy};});
+  const sol=laneSolve(laneField(sts,LANE.mode),LANE.len,LANE.mv,LANE.bc);
+  const share=sts.map((_,i)=>laneSolve(laneField(sts.map((t,j)=>j===i?t:{x:t.x,wx:0,wy:0}),LANE.mode),LANE.len,LANE.mv,LANE.bc).y);
+  return{sw,sts,sol,share};
+}
+
+/* ---------- view ---------- */
+const LV={on:false,raf:0,last:0,res:null,parts:[],lat:0,tSolve:0,tOut:0,sig:''};
+function laneUI(){
+  const box=$('lanest');box.textContent='';
+  LANE.st.forEach((s,i)=>{
+    const spdV=el('span',{},''),dirV=el('span',{},'');
+    const sync=()=>{spdV.textContent=s.spd.toFixed(1)+' m/s';dirV.textContent=Math.round(s.dir)+'° '+laneDirWord(s.dir);};
+    const src=el('select',{class:'lnsrc',onchange:e=>{s.src=e.target.value;laneChanged();}});
+    const p=el('div',{class:'panel dev',style:'--c:'+LANE_COL[i]},
+      el('h2',{},el('span',{style:'color:'+LANE_COL[i]},'Station '+(i+1))),
+      el('div',{class:'row'},
+        el('div',{},el('div',{class:'lbl'},'Name'),el('input',{value:s.name,maxLength:16,oninput:e=>{s.name=e.target.value.slice(0,16);laneChanged();}})),
+        el('div',{},el('div',{class:'lbl'},'Side'),(()=>{const se=el('select',{onchange:e=>{s.side=e.target.value;laneChanged();}},el('option',{value:'L'},'Left'),el('option',{value:'R'},'Right'));se.value=s.side;return se;})()),
+        el('div',{},el('div',{class:'lbl'},'Distance % of lane'),el('input',{type:'number',min:1,max:99,step:1,value:s.pct,oninput:e=>{s.pct=clampN(e.target.value,1,99,s.pct);laneChanged();}}))),
+      el('div',{class:'lbl'},'Wind source'),src,
+      el('div',{class:'lnman'},
+        el('div',{class:'lbl'},'Speed ',spdV),el('input',{type:'range',min:0,max:12,step:0.1,value:s.spd,oninput:e=>{s.spd=+e.target.value;sync();laneChanged();}}),
+        el('div',{class:'lbl'},'From ',dirV),el('input',{type:'range',min:0,max:359,step:1,value:s.dir,oninput:e=>{s.dir=+e.target.value;sync();laneChanged();}}),
+        el('label',{class:'ck'},el('input',{type:'checkbox',checked:s.gust,onchange:e=>{s.gust=e.target.checked;laneChanged();}}),'Gusts (simulated)')));
+    p.src=src;p.man=p.querySelector('.lnman');sync();box.appendChild(p);
+  });
+  laneSources(true);
+}
+function laneDirWord(d){return d<23||d>=338?'head':d<68?'front-right':d<113?'from right':d<158?'rear-right':d<203?'tail':d<248?'rear-left':d<293?'from left':'front-left';}
+function laneSources(force){ // rebuild the source pickers only when the device list changes
+  const cal=DEVICES.filter(d=>d.profile==='calypso');
+  const sig=cal.map(d=>d.n+':'+d.label+':'+d.name).join('|');
+  if(!force&&sig===LV.sig)return;LV.sig=sig;
+  [...$('lanest').children].forEach((p,i)=>{
+    const s=LANE.st[i],sel=p.src;sel.textContent='';
+    sel.appendChild(el('option',{value:'manual'},'Manual (sliders below)'));
+    cal.forEach(d=>sel.appendChild(el('option',{value:String(d.n)},'Live: '+d.label+' '+d.name)));
+    if(s.src!=='manual'&&!cal.some(d=>String(d.n)===s.src))sel.appendChild(el('option',{value:s.src},'Live: device not connected'));
+    sel.value=s.src;p.man.hidden=s.src!=='manual';
+  });
+}
+function laneChanged(){
+  laneSave();LV.tSolve=0;
+  [...$('lanest').children].forEach((p,i)=>{p.man.hidden=LANE.st[i].src!=='manual';});
+}
+function laneStart(){if(LV.on)return;LV.on=true;laneSources(false);LV.raf=requestAnimationFrame(laneTick);}
+function laneStop(){LV.on=false;if(LV.raf)cancelAnimationFrame(LV.raf);LV.raf=0;}
+function laneTick(now){
+  if(!LV.on)return;
+  if(now-LV.tSolve>150||!LV.res){LV.res=laneCompute(Date.now());LV.tSolve=now;}
+  if(now-LV.tOut>300){laneOut();laneSources(false);LV.tOut=now;}
+  laneDraw(now);
+  LV.raf=requestAnimationFrame(laneTick);
+}
+function laneOut(){
+  const r=LV.res;if(!r)return;const y=r.sol.y,L=LANE.len;
+  const side=v=>(Math.abs(v)<0.0005?'':v>0?' R':' L');
+  const set=(id,v)=>{const e=$(id);if(e)e.textContent=v;};
+  set('lnDrift',(Math.abs(y)*1000).toFixed(1)+side(y));
+  set('lnMoa',(Math.abs(Math.atan(y/L))*3437.747).toFixed(2)+side(y));
+  set('lnMrad',(Math.abs(Math.atan(y/L))*1000).toFixed(2)+side(y));
+  set('lnTof',(r.sol.t*1000).toFixed(0));
+  r.share.forEach((v,i)=>{set('lnS'+i,(Math.abs(v)*1000).toFixed(1)+side(v));set('lnSn'+i,LANE.st[i].name+' share');});
+  set('lnState',r.sw.map((w,i)=>LANE.st[i].name+': '+w.state).join(' · '));
+}
+function laneDraw(now){
+  const cv=$('lanecv');const ctx=cv&&cv.getContext&&cv.getContext('2d');if(!ctx||!LV.res)return;
+  const W=Math.max(280,cv.parentElement.clientWidth||320),H=Math.round(Math.min(Math.max(W*1.35,380),Math.max(380,(window.innerHeight||800)-230)));
+  const dpr=window.devicePixelRatio||1;
+  if(cv.width!==Math.round(W*dpr)||cv.height!==Math.round(H*dpr)){cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr);cv.style.width=W+'px';cv.style.height=H+'px';}
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  const r=LV.res,L=LANE.len,top=64,bot=H-40,cx=W/2,half=Math.min(W*0.19,110),post=half+(W/2-half)/2;
+  const Y=x=>bot-x/L*(bot-top),pxm=(bot-top)/L;
+  // sideways scale: biggest offset fills ~80 % of the lane half-width (smoothed so it doesn't jump)
+  const ymax=Math.max(0.01,...r.sol.path.map(p=>Math.abs(p[1])),...r.share.map(Math.abs));
+  const want=half*0.8/ymax;LV.lat=LV.lat?LV.lat+(want-LV.lat)*0.08:want;
+  const X=y=>cx+y*LV.lat;
+  ctx.fillStyle='#11141a';ctx.fillRect(0,0,W,H);
+  // station zones on the lane
+  const xs=r.sts.map(s=>s.x);
+  if(LANE.mode==='nearest'){
+    const order=[0,1].sort((a,b)=>xs[a]-xs[b]),mid=(xs[order[0]]+xs[order[1]])/2;
+    [[0,mid,order[0]],[mid,L,order[1]]].forEach(([a,b,i])=>{ctx.fillStyle=LANE_COL[i]+'1f';ctx.fillRect(cx-half,Y(b),half*2,Y(a)-Y(b));});
+    ctx.strokeStyle='rgba(255,255,255,.25)';ctx.setLineDash([4,4]);ctx.beginPath();ctx.moveTo(cx-half,Y(mid));ctx.lineTo(cx+half,Y(mid));ctx.stroke();ctx.setLineDash([]);
+  }else{
+    const g=ctx.createLinearGradient(0,Y(Math.min(...xs)),0,Y(Math.max(...xs)));const lo=xs[0]<=xs[1]?0:1;
+    g.addColorStop(0,LANE_COL[lo]+'26');g.addColorStop(1,LANE_COL[1-lo]+'26');ctx.fillStyle=g;ctx.fillRect(cx-half,top,half*2,bot-top);
+  }
+  ctx.strokeStyle='rgba(255,255,255,.18)';ctx.strokeRect(cx-half,top,half*2,bot-top);
+  // distance ticks
+  const step=L<=60?10:L<=150?25:L<=400?50:100;ctx.fillStyle='#6f6d67';ctx.font='10px monospace';ctx.textAlign='left';
+  for(let d=0;d<=L+1e-9;d+=step){ctx.fillRect(cx-half,Y(d),5,1);if(d<L-step/2)ctx.fillText(d+' m',cx-half+7,Y(d)+3);}
+  // aim line (no wind)
+  ctx.strokeStyle='rgba(255,255,255,.2)';ctx.setLineDash([2,5]);ctx.beginPath();ctx.moveTo(cx,bot);ctx.lineTo(cx,top);ctx.stroke();ctx.setLineDash([]);
+  // wind streaks: each moves with the wind at its own spot (sideways ~1 lane width per 1.7 s at 3 m/s)
+  const field=laneField(r.sts,LANE.mode),dt=Math.min(0.05,(now-(LV.last||now))/1000);LV.last=now;
+  while(LV.parts.length<70)LV.parts.push({x:Math.random()*L,y:(Math.random()*2-1)*half});
+  const latPx=half/2.5;
+  ctx.lineWidth=1.5;
+  for(const p of LV.parts){
+    const[wx,wy]=field(p.x);p.x+=wx*dt*Math.max(1,L/60);p.y+=wy*latPx*dt;
+    if(p.x<0||p.x>L||Math.abs(p.y)>half){p.x=Math.random()*L;p.y=wy>0?-half:wy<0?half:(Math.random()*2-1)*half;}
+    const near=Math.abs(p.x-xs[0])<=Math.abs(p.x-xs[1])?0:1;
+    const sp=Math.hypot(wx,wy);if(sp<0.05)continue;
+    const ux=wy/sp,uy=-wx/sp*pxm/latPx; // screen direction of the wind at this spot
+    const n=Math.hypot(ux,uy)||1,len=4+Math.min(10,sp*2);
+    ctx.strokeStyle=LANE_COL[near]+'80';ctx.beginPath();const sx=cx+p.y,sy=Y(p.x);ctx.moveTo(sx,sy);ctx.lineTo(sx-ux/n*len,sy-uy/n*len);ctx.stroke();
+  }
+  ctx.lineWidth=1;
+  // target
+  ctx.textAlign='center';
+  [[18,'#f4f3ef'],[12,'#0a0c0f'],[6,'#f4f3ef'],[2.5,'#e07a5f']].forEach(([rr,c])=>{ctx.fillStyle=c;ctx.beginPath();ctx.arc(cx,top,rr,0,7);ctx.fill();});
+  ctx.fillStyle='#bdbab1';ctx.fillText('TARGET '+L+' m',cx,top-24);
+  // firing point
+  ctx.fillStyle='#c8a96e';ctx.fillRect(cx-9,bot+4,18,6);ctx.fillText('FIRING POINT',cx,bot+24);
+  // bullet path
+  ctx.strokeStyle='#c8a96e';ctx.lineWidth=2;ctx.beginPath();r.sol.path.forEach((p,i)=>{const sx=X(p[1]),sy=Y(p[0]);i?ctx.lineTo(sx,sy):ctx.moveTo(sx,sy);});ctx.stroke();ctx.lineWidth=1;
+  // impact
+  const iy=X(r.sol.y);ctx.strokeStyle='#e07a5f';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(iy-6,top-6);ctx.lineTo(iy+6,top+6);ctx.moveTo(iy+6,top-6);ctx.lineTo(iy-6,top+6);ctx.stroke();ctx.lineWidth=1;
+  ctx.fillStyle='#e07a5f';ctx.fillText((Math.abs(r.sol.y)*1000).toFixed(1)+' mm '+(r.sol.y>0.0005?'R':r.sol.y<-0.0005?'L':''),iy,top+32);
+  // bullet: real flight slowed down 5×, then a short pause
+  const T=r.sol.t,loop=T*5000+700,ph=(now%loop)/(T*5000);
+  if(ph<=1){const tt=ph*T,P=r.sol.path;let k=1;while(k<P.length-1&&P[k][2]<tt)k++;const a=P[k-1],b=P[k],f=b[2]>a[2]?(tt-a[2])/(b[2]-a[2]):0;
+    const bx=X(a[1]+(b[1]-a[1])*f),by=Y(a[0]+(b[0]-a[0])*f);ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(bx,by,4,0,7);ctx.fill();}
+  // stations: post beside the lane + arrow pointing where the wind blows
+  r.sw.forEach((w,i)=>{
+    const s=LANE.st[i],sy=Y(w.x),sx=s.side==='L'?cx-post:cx+post;
+    ctx.fillStyle=LANE_COL[i];ctx.beginPath();ctx.arc(sx,sy,6,0,7);ctx.fill();
+    const[wx,wy]=laneVec(w.spd,w.dir),sp=Math.hypot(wx,wy);
+    if(sp>0.05){const L2=Math.min(42,10+sp*5),ux=wy/sp,uy=-wx/sp;
+      ctx.strokeStyle=LANE_COL[i];ctx.lineWidth=2.5;ctx.beginPath();ctx.moveTo(sx-ux*L2/2,sy-uy*L2/2);const ex=sx+ux*L2/2,ey=sy+uy*L2/2;ctx.lineTo(ex,ey);
+      ctx.moveTo(ex,ey);ctx.lineTo(ex-ux*7-uy*5,ey-uy*7+ux*5);ctx.moveTo(ex,ey);ctx.lineTo(ex-ux*7+uy*5,ey-uy*7-ux*5);ctx.stroke();ctx.lineWidth=1;}
+    ctx.textAlign='center';ctx.fillStyle=LANE_COL[i];ctx.fillText(s.name.slice(0,10),sx,sy-26);
+    ctx.fillStyle='#bdbab1';ctx.fillText(w.spd.toFixed(1)+' m/s',sx,sy+32);ctx.fillText(Math.round(w.dir)+'°',sx,sy+44);
+    ctx.fillStyle=w.state.startsWith('LOST')?'#e07a5f':'#6f6d67';ctx.fillText(w.state.split(' · ')[0],sx,sy+56);
+  });
+  // legend
+  ctx.textAlign='left';ctx.fillStyle='#6f6d67';
+  const ex=LV.lat/pxm;ctx.fillText((LANE.mode==='nearest'?'nearest station':'blend between stations')+' · sideways ×'+(ex>=10?Math.round(ex):ex.toFixed(1)),8,14);
 }
 
 /* ---------- capture sessions (V1.3.0, LAB-03) ----------
@@ -882,6 +1124,13 @@ $('capdumpbtn').addEventListener('click',capGattDump);
 $('capsavebtn').addEventListener('click',()=>capDownload(true));
 $('captxtbtn').addEventListener('click',()=>capDownload(false));
 capRenderUI();
+$('lnLen').value=LANE.len;$('lnMode').value=LANE.mode;$('lnMv').value=LANE.mv;$('lnBc').value=LANE.bc;
+$('lnLen').addEventListener('input',e=>{LANE.len=clampN(e.target.value,10,1000,LANE.len);LV.parts.length=0;laneChanged();});
+$('lnMode').addEventListener('change',e=>{LANE.mode=e.target.value==='blend'?'blend':'nearest';laneChanged();});
+$('lnMv').addEventListener('input',e=>{LANE.mv=clampN(e.target.value,50,400,LANE.mv);laneChanged();});
+$('lnBc').addEventListener('input',e=>{LANE.bc=clampN(e.target.value,0.02,0.5,LANE.bc);laneChanged();});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')laneStop();else if(!$('tab-lane').hidden)laneStart();});
+laneUI();
 {let t='devices';try{t=localStorage.getItem('sen_lab_tab')||t;}catch(e){}showTab(t);}
 checkCaps().then(()=>log(null,'SEN BLE Probe V'+VERSION+' ready. '+CAPS.join(' · ')));
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(e=>log(null,'Service worker not registered: '+e.message,'er'));
