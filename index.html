@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#0a0c0f">
-<title>SEN BLE Probe V1.4.0</title>
+<title>SEN BLE Probe V1.5.0</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="probe-icon-192.png">
 <link rel="apple-touch-icon" href="probe-icon-192.png">
@@ -79,6 +79,7 @@ table.capsum td{padding:4px 5px;border-bottom:1px solid rgba(255,255,255,.04);co
 table.capsum td.hexcell{word-break:break-all;color:var(--text)}
 table.capsum td.chg{color:var(--gold);font-weight:600}
 .capwrap{max-height:340px;overflow:auto}
+tr.hit td{color:var(--green,#7ab87a);font-weight:600}
 /* V1.4.0 wind lane */
 #lanewrap{width:100%;margin-top:10px}
 #lanecv{display:block;width:100%;border-radius:8px;touch-action:pan-y}
@@ -87,7 +88,7 @@ pre.dump{font-size:10px;white-space:pre-wrap;word-break:break-all;color:var(--te
 </style>
 </head>
 <body>
-<h1>SEN · BLE Probe <span style="font-size:11px;color:var(--text3)">V1.4.0</span></h1>
+<h1>SEN · BLE Probe <span style="font-size:11px;color:var(--text3)">V1.5.0</span></h1>
 <div class="sub">Multi-device BLE diagnostic for the SEN platform. Device profiles: Calypso Mini (wind), FX Pocket Pro (chrono, GATT), FX True Ballistic (radar, GATT), FX Pocket V2/D1 (chrono, broadcast), Generic (anything else, e.g. a rangefinder). Chrome on Android or desktop, HTTPS only.</div>
 <div class="strip" id="strip" aria-label="Devices"></div>
 
@@ -105,8 +106,9 @@ pre.dump{font-size:10px;white-space:pre-wrap;word-break:break-all;color:var(--te
   <label class="ck"><input type="checkbox" id="optSubAll" checked> Subscribe to every notify/indicate characteristic</label>
   <label class="ck"><input type="checkbox" id="optRead" checked> Read every readable characteristic once</label>
   <label class="ck"><input type="checkbox" id="optAds"> Also watch advertisements after connecting</label>
+  <label class="ck"><input type="checkbox" id="optWide" checked> Wide service net for unknown devices (rangefinders…): every 16-bit service in 1800–18FF, FE00–FEFF, FF00–FFFF plus common BLE-serial module services</label>
   <div class="lbl">Extra service UUIDs (comma-separated, 16-bit hex or 128-bit)</div>
-  <input id="extraSvc" placeholder="from nRF Connect, e.g. fff0, 0000ffe0-0000-1000-8000-00805f9b34fb">
+  <input id="extraSvc" placeholder="from nRF Connect, e.g. fff0, 0000ffe0-0000-1000-8000-00805f9b34fb" onchange="extraSave()">
   <div class="lbl">Extra manufacturer company IDs for adverts (hex)</div>
   <input id="extraMfr" placeholder="e.g. 004c, 0499">
   <div class="note">Web Bluetooth only exposes services listed before connecting. Built in: ISSC UART (Calypso), FX VRS (Pocket Pro), FX True Ballistic, Nordic UART, FFF0/FFE0/FFE5/FFB0/FFD0, battery, device info, ESS, DFU. For an unknown device, read its service UUIDs in nRF Connect and paste them above before adding it.</div>
@@ -142,6 +144,9 @@ pre.dump{font-size:10px;white-space:pre-wrap;word-break:break-all;color:var(--te
   <div class="lbl">Markers — tap when the rifle / device is in that state</div>
   <div class="steps" id="capmarks"></div>
   <div class="row" style="margin-top:8px"><input id="capmarktxt" placeholder="Own marker, e.g. Rifle on bipod" maxlength="60"><button id="capmarkbtn">Mark</button></div>
+  <div class="lbl">Rangefinder: right after each ranging, type what the display shows and tap Mark range</div>
+  <div class="row"><input id="caprng" type="number" step="0.1" placeholder="Distance shown" style="flex:1 1 90px"><select id="caprngu" style="flex:0 0 auto"><option value="m">m</option><option value="yd">yd</option></select><input id="capang" type="number" step="0.1" placeholder="Angle ° (if shown)" style="flex:1 1 90px"><button id="caprngbtn">Mark range</button></div>
+  <div id="capfind"></div>
   <div class="row" style="margin-top:10px">
     <button class="sm" id="capreadbtn">Read all now</button><button class="sm" id="capdumpbtn">GATT dump</button>
     <span class="sp"></span><button class="sm" id="capsavebtn">Save .json</button><button class="sm" id="captxtbtn">Save .txt</button>
@@ -202,7 +207,7 @@ pre.dump{font-size:10px;white-space:pre-wrap;word-break:break-all;color:var(--te
 
 <script>
 'use strict';
-const VERSION='1.4.0';
+const VERSION='1.5.0';
 const ISSC='49535343-fe7d-4ae5-8fa9-9fafd205e455';
 const NUS='6e400001-b5a3-f393-e0a9-e50e24dcca9e';
 const VRS='5445883a-3cab-42e5-b625-ca4e243f5a2c', VRS_VEL='5445883a-3cab-42e5-b625-ca4e243f5a2d', VRS_CMD='5445883a-3cab-42e5-b625-ca4e243f5a2e';
@@ -210,6 +215,20 @@ const TB='00001623-88ec-688c-644b-3fa706c0bb76', TB_SHOT='00001624-88ec-688c-644
 const FFF1='0000fff1-0000-1000-8000-00805f9b34fb', FFF2='0000fff2-0000-1000-8000-00805f9b34fb', BATT='00002a19-0000-1000-8000-00805f9b34fb';
 const BASE_SVCS=[ISSC,NUS,VRS,TB,0xFFF0,0xFFE0,0xFFE5,0xFFB0,0xFFD0,0xFEE7,0xFE59,0x180F,0x180A,0x1800,0x1801,0x181A,0x1530];
 const BASE_MFR=[0x0059];
+/* V1.5.0 (LAB-04/05 prep): Web Bluetooth shows only services named before connecting, and a rangefinder's
+   protocol service is unknown. The wide net names every 16-bit UUID in the standard (1800–18FF), member
+   (FE00–FEFF) and vendor (FF00–FFFF) ranges, plus the 128-bit services of common BLE-serial modules. Blocklisted
+   UUIDs in optionalServices are dropped silently by the browser (Web Bluetooth spec; WPT
+   blocklisted-service-in-optionalServices). A 128-bit service outside this list still needs nRF Connect once. */
+const SERIAL_SVCS=['0783b03e-8535-b5a0-7140-a304d2495cb7',   // Dialog DSPS
+  '2456e1b9-26e2-8f83-e744-f34f01e9d701',                      // u-blox serial
+  '569a1101-b87f-490c-92cb-11ba5ea5167c',                      // Laird virtual serial port
+  '00035b03-58e6-07dd-021a-08123a000300',                      // Microchip MLDP (RN4020)
+  '331a36f5-2459-45ea-9d95-6142f0c4b307',                      // Silicon Labs BGX
+  '00010203-0405-0607-0809-0a0b0c0d1910',                      // Telink
+  '00001523-1212-efde-1523-785feabcd123'];                     // Nordic LED-button / template
+const WIDE_SVCS=(()=>{const a=[];for(const [lo,hi] of [[0x1800,0x18ff],[0xfe00,0xfeff],[0xff00,0xffff]])for(let u=lo;u<=hi;u++)a.push(u);return a.concat(SERIAL_SVCS);})();
+function extraSave(){try{localStorage.setItem('sen_lab_extrasvc',$('extraSvc').value);}catch(e){}}
 const FX_BCAST_UUID={'5765fdce':'V2','5765fdcd':'D1'};
 /* :DU unlock token per unit, captured from Anemotracker (HCI snoop 2026-10-26). Fixed per device, not a clock:
    until its own token is :AK'd the unit answers :NA to :CC and never streams :WU. New unit = one snoop capture. */
@@ -571,10 +590,11 @@ async function addDevice(){
   if(!(navigator.bluetooth&&navigator.bluetooth.requestDevice)){alert('Web Bluetooth not available. Use Chrome on Android or Chrome/Edge desktop over HTTPS (not iOS).');return;}
   let dev;
   try{
+    const wide=$('optWide')&&$('optWide').checked;
     dev=await navigator.bluetooth.requestDevice({acceptAllDevices:true,
-      optionalServices:[...BASE_SVCS,...parseList($('extraSvc').value)],
+      optionalServices:[...new Set([...BASE_SVCS,...(wide?WIDE_SVCS:[]),...parseList($('extraSvc').value)])],
       optionalManufacturerData:[...BASE_MFR,...parseList($('extraMfr').value).filter(x=>typeof x==='number')]});
-  }catch(e){log(null,'Chooser: '+e.message,e.name==='NotFoundError'?'sys':'er');return;}
+  }catch(e){log(null,'Chooser: '+e.message+(e.name!=='NotFoundError'&&$('optWide').checked?' — if this repeats, untick "Wide service net" and try again.':''),e.name==='NotFoundError'?'sys':'er');return;}
   await attach(dev,$('optGatt').checked);
 }
 async function attach(dev,doGatt){
@@ -582,7 +602,7 @@ async function attach(dev,doGatt){
   if(ex){log(ex,'Already in the list: reconnecting.');if(doGatt)await connect(ex);return ex;}
   const n=++devSeq;
   const d={n,dev,name:dev.name||'(no name)',label:'D'+n,color:COLORS[(n-1)%COLORS.length],profile:'generic',
-    chars:new Map(),svcs:new Set(),writables:[],subscribed:new Set(),q:Promise.resolve(),st:{idleRun:0},ui:{},shots:[],connected:false,watching:false,adSeen:0,lastAd:''};
+    chars:new Map(),svcs:new Set(),advUuids:new Set(),writables:[],subscribed:new Set(),q:Promise.resolve(),st:{idleRun:0},ui:{},shots:[],connected:false,watching:false,adSeen:0,lastAd:''};
   DEVICES.push(d);buildCard(d);refreshFilter();
   log(d,'Added "'+d.name+'" id='+dev.id,'hl');
   dev.addEventListener('gattserverdisconnected',()=>onDisconnect(d));
@@ -601,6 +621,7 @@ async function connect(d){
     }
     d.server=server;d.connected=true;d.st.idleRun=0;
     await discover(d);
+    advCheck(d);
     const auto=MATCH_ORDER.find(k=>PROFILES[k].match(d));
     setProfile(d,d.ui.profSel.dataset.manual?d.profile:auto,true);
     await subscribeNeeded(d);
@@ -675,11 +696,24 @@ function onAdvert(d,ev){
     capRecord(d,'adv','mfr '+id.toString(16).padStart(4,'0'),b);
     if(id===0x0059&&parseFxBroadcast(b)){if(d.profile==='generic'&&!d.ui.profSel.dataset.manual){log(d,'FX Pocket broadcast detected: switching profile.','hl');setProfile(d,'fxbcast',true);}
       if(d.profile==='fxbcast')PROFILES.fxbcast.advert(d,b);}});
-  ev.serviceData&&ev.serviceData.forEach((v,u)=>parts.push('svc '+shortU(u)+' ['+hexOf(new Uint8Array(v.buffer.slice(v.byteOffset,v.byteOffset+v.byteLength)))+']'));
+  ev.serviceData&&ev.serviceData.forEach((v,u)=>{const b=new Uint8Array(v.buffer.slice(v.byteOffset,v.byteOffset+v.byteLength));parts.push('svc '+shortU(u)+' ['+hexOf(b)+']');capRecord(d,'adv','svc '+shortU(u),b);});
   const sig=parts.join(' ');
+  if(ev.uuids&&ev.uuids.length){const n0=d.advUuids.size;ev.uuids.forEach(u=>d.advUuids.add(String(u).toLowerCase()));if(d.advUuids.size!==n0)advCheck(d);}
   d.ui.adInfo.textContent='adverts '+d.adSeen+' · RSSI '+ev.rssi+' dBm'+(ev.txPower!=null?' · tx '+ev.txPower:'');
   if($('hideIdle').checked&&sig===d.lastAd)return;d.lastAd=sig;
   log(d,'ADV rssi='+ev.rssi+' '+(sig||'(no mfr/service data)')+(ev.uuids&&ev.uuids.length?' uuids='+ev.uuids.map(shortU).join(','):''),'other');
+}
+/* V1.5.0: services the device advertises but that were not reachable over GATT (not on the list when the
+   chooser opened) — one tap adds them to the extra list for the next "+ Add device". */
+function advCheck(d){
+  const box=d.ui.advBox;if(!box)return;
+  const miss=[...d.advUuids].filter(u=>!d.svcs.has(u));
+  box.replaceChildren();if(!miss.length)return;
+  box.appendChild(el('div',{class:'note'},'Advertised but not reachable yet: '+miss.join(', ')));
+  box.appendChild(el('button',{class:'sm',onclick:()=>{const cur=parseList($('extraSvc').value).map(String);
+    $('extraSvc').value=[...new Set([...cur,...miss])].join(', ');extraSave();
+    log(d,'Added '+miss.length+' advertised service(s) to the extra list. Remove this device and tap + Add device again.','hl');}},'Add them to the service list'));
+  if(d.connected)log(d,'Advertised service(s) not reachable over GATT: '+miss.join(', '),'er');
 }
 function setDot(d,cls,txt){d.ui.dot.className='dot '+cls;d.ui.status.textContent=txt;d.ui.connBtn.textContent=d.connected?'Disconnect':'Connect';renderStrip();}
 function setProfile(d,key,auto){
@@ -704,12 +738,12 @@ function buildCard(d){
   const wterm=el('select',null,el('option',{value:'rr'},'\\r\\r (Calypso)'),el('option',{value:'r'},'\\r'),el('option',{value:'rn'},'\\r\\n'),el('option',{value:'n'},'\\n'),el('option',{value:'none'},'none'));
   const wtype=el('select',null,el('option',{value:'auto'},'auto'),el('option',{value:'nr'},'without response'),el('option',{value:'wr'},'with response'));
   const cmd=el('input',{placeholder:'ASCII or hex: 3a 47 4b 0d 0d',onkeydown:e=>{if(e.key==='Enter')manualWrite(d);}});
-  const adInfo=el('div',{class:'note'},'');
+  const adInfo=el('div',{class:'note'},''),advBox=el('div');
   const card=el('div',{class:'panel dev',style:'--c:'+d.color},
     el('h2',null,dot,lblIn,el('span',{style:'text-transform:none;letter-spacing:0;color:var(--text)'},d.name),profTag,el('span',{class:'sp'}),connBtn,adBtn,el('button',{class:'sm warn',onclick:()=>removeDevice(d)},'Remove')),
     el('div',{class:'row'},status),
     el('div',{class:'lbl'},'Profile (auto-detected after discovery; change to override)'),profSel,
-    body,adInfo,
+    body,adInfo,advBox,
     el('details',null,el('summary',null,'Services & characteristics'),disco),
     el('details',null,el('summary',null,'Manual write'),
       el('div',{class:'lbl'},'Target characteristic'),wtarget,
@@ -717,7 +751,7 @@ function buildCard(d){
       el('div',{class:'row',style:'margin-top:8px'},cmd,el('button',{class:'primary',onclick:()=>manualWrite(d)},'Send')))
   );
   $('devices').appendChild(card);
-  Object.assign(d.ui,{card,dot,status,profTag,connBtn,adBtn,profSel,body,disco,wtarget,wmode,wterm,wtype,cmd,adInfo});
+  Object.assign(d.ui,{card,dot,status,profTag,connBtn,adBtn,profSel,body,disco,wtarget,wmode,wterm,wtype,cmd,adInfo,advBox});
   setProfile(d,'generic',true);
 }
 async function manualWrite(d){
@@ -986,6 +1020,7 @@ function laneDraw(now){
 const CAP_PRESETS={
   fxangle:{name:'FX angle test (LAB-03)',marks:['Level','Pitch up ~10°','Pitch down ~10°','Level','Cant left ~10°','Cant right ~10°','Level','Shot']},
   env:{name:'Environment hunt (temp / humidity / pressure)',marks:['Indoors','Outdoors','Hand on chrono (warm)','Back indoors']},
+  rangefinder:{name:'Rangefinder (LAB-04 / LAB-05)',marks:['Power on','Ranged near target','Ranged far target','Aim up (angle)','Aim down (angle)','Unit button m↔yd','Mode button','Scan mode on','Scan mode off','Bluetooth button']},
   free:{name:'Free (own markers only)',marks:[]}
 };
 const CAP={on:false,t0:0,name:'',preset:'fxangle',devs:[],events:[],markers:[],last:new Map(),atMark:new Map(),pollIv:null};
@@ -1010,6 +1045,7 @@ function capStart(){
   if(CAP.on){capStop();return;}
   CAP.devs=[...$('capdevs').querySelectorAll('input[type=checkbox]')].filter(c=>c.checked).map(c=>+c.dataset.n);
   if(!CAP.devs.length){alert('Tick at least one device.');return;}
+  CAP_RANGES.length=0;
   Object.assign(CAP,{on:true,t0:Date.now(),name:$('capname').value.trim()||CAP_PRESETS[$('cappreset').value].name,preset:$('cappreset').value,events:[],markers:[],last:new Map(),atMark:new Map()});
   log(null,'Capture started: "'+CAP.name+'" on '+CAP.devs.map(n=>DEVICES.find(d=>d.n===n).label).join(', '),'hl');
   if($('cappoll').checked)CAP.pollIv=setInterval(()=>capReadAll(true),2000);
@@ -1062,14 +1098,78 @@ function capRenderUI(){
   ['cappreset','capname','cappoll'].forEach(id=>$(id).disabled=CAP.on);
   const mk=$('capmarks');mk.textContent='';
   (CAP_PRESETS[$('cappreset').value]||CAP_PRESETS.free).marks.forEach(m=>mk.appendChild(el('button',{disabled:!CAP.on,onclick:()=>capMark(m)},m)));
-  $('capmarkbtn').disabled=!CAP.on;$('capsavebtn').disabled=$('captxtbtn').disabled=!CAP.events.length;
+  $('capmarkbtn').disabled=!CAP.on;$('caprngbtn').disabled=!CAP.on;$('capsavebtn').disabled=$('captxtbtn').disabled=!CAP.events.length;
   capRefreshDevs();capRenderSummary();renderStrip();
+}
+/* ---------- V1.5.0 rangefinder number finder (LAB-04 / LAB-05) ----------
+   After each ranging the user types the distance (and angle) the display shows and taps "Mark range". The
+   finder searches what the devices sent between the previous range mark (at most 60 s back) and 2 s after
+   this one for that number in every common encoding: ASCII text (decimal, or ×10 / ×100 as an integer),
+   unsigned 16/24/32-bit integers little/big-endian at ×1 / ×10 / ×100 (±1 count), BCD, float32 LE/BE — in
+   the unit shown and in the other unit (m ↔ yd). The angle the same way, signed. Positions that match on
+   every ranging are the answer; one ranging alone can match by chance, so range at least two different
+   distances. Read-only: nothing is ever written to a device. */
+const CAP_RANGES=[];
+const YD=0.9144;
+function capBytes(hex){return hex?hex.split(' ').map(h=>parseInt(h,16)):[];}
+function capReadInt(b,o,w,le,signed){let x=0;for(let i=0;i<w;i++)x=x*256+b[le?o+w-1-i:o+i];if(signed&&x>=2**(8*w-1))x-=2**(8*w);return x;}
+function capBcd(b,o,w){let x=0;for(let i=0;i<w;i++){const hi=b[o+i]>>4,lo=b[o+i]&15;if(hi>9||lo>9)return null;x=x*100+hi*10+lo;}return x;}
+// Every place in one payload where `val` appears. Returns [{off,len,enc}].
+function capFindIn(b,asc,val,signed){
+  const hits=[],add=(off,len,enc,eg)=>hits.push({off,len,enc,eg});
+  // Text: digits only (a sign or unit letter next to them doesn't move the position); the encoding label is
+  // value-free so the same field matches across rangings — the text itself is kept as an example.
+  const re=/\d+(?:\.\d+)?/g,av=Math.abs(val);let m;
+  while((m=re.exec(asc))){const tok=m[0],x=parseFloat(tok),at=m.index;
+    if(Math.abs(x-av)<=0.051)add(at,tok.length,'ASCII',tok);
+    else if(!/\./.test(tok))[10,100].forEach(k=>{if(av*k>=20&&x===Math.round(av*k))add(at,tok.length,'ASCII ×'+k,tok);});}
+  for(const w of [2,3,4])for(let o=0;o+w<=b.length;o++)for(const le of [true,false]){
+    const x=capReadInt(b,o,w,le,signed);
+    for(const k of [1,10,100]){const t=val*k;if(Math.abs(t)>=20&&Math.abs(x-t)<=1)add(o,w,(signed?'int':'uint')+(8*w)+' '+(le?'LE':'BE')+' ×'+k);}
+    if(!signed){const bc=capBcd(b,o,w);if(bc!=null)for(const k of [1,10,100]){const t=Math.round(val*k);if(t>=20&&bc===t)add(o,w,'BCD ×'+k);}}
+  }
+  for(let o=0;o+4<=b.length;o++)for(const le of [true,false]){const f=new DataView(new Uint8Array(b.slice(o,o+4)).buffer).getFloat32(0,le);
+    if(isFinite(f)&&Math.abs(f)>=1&&Math.abs(f-val)<=0.06)add(o,4,'float32 '+(le?'LE':'BE'));}
+  return hits;
+}
+function capMarkRange(){
+  if(!CAP.on)return;
+  const v=parseFloat($('caprng').value),u=$('caprngu').value==='yd'?'yd':'m',a=$('capang').value===''?null:parseFloat($('capang').value);
+  if(!(v>0&&v<100000)){alert('Type the distance the rangefinder shows.');return;}
+  if(a!=null&&!(Math.abs(a)<=90)){alert('Angle must be between −90° and 90°.');return;}
+  capMark('RANGE '+v+' '+u+(a!=null?' · angle '+(a>0?'+':'')+a+'°':''));
+  CAP_RANGES.push({t:capT(),v,u,a});$('caprng').value='';$('capang').value='';
+  setTimeout(capRenderFind,2100);capRenderFind();
+}
+// Tally over all range marks: a location that carried the number every time is the answer.
+function capFindAll(){
+  const tally=new Map(),bump=(key,what,ri)=>{const e=tally.get(key)||{...what,n:0,marks:new Set()};if(!e.marks.has(ri)){e.marks.add(ri);e.n++;}tally.set(key,e);};
+  CAP_RANGES.forEach((r,ri)=>{
+    const from=Math.max(ri?CAP_RANGES[ri-1].t:0,r.t-60000),to=r.t+2000;
+    const evs=CAP.events.filter(e=>e.kind!=='mark'&&e.kind!=='gatt'&&e.hex&&e.t>from&&e.t<=to);
+    const targets=[[r.v,r.u,'distance',false],[r.u==='m'?r.v/YD:r.v*YD,r.u==='m'?'yd':'m','distance',false]];
+    if(r.a!=null)targets.push([r.a,'°','angle',true]);
+    evs.forEach(e=>{const b=capBytes(e.hex);targets.forEach(([val,unit,what,signed])=>capFindIn(b,e.asc||'',val,signed).forEach(h=>
+      bump([e.dev,e.ch,h.off,h.len,h.enc,unit,what].join('|'),{dev:e.dev,ch:e.ch,off:h.off,len:h.len,enc:h.enc,eg:h.eg,unit,what},ri)));});
+  });
+  return[...tally.values()].sort((x,y)=>y.n-x.n||(x.what<y.what?-1:1));
+}
+function capRenderFind(){
+  const box=$('capfind');if(!box)return;box.replaceChildren();
+  if(!CAP_RANGES.length)return;
+  const all=capFindAll(),N=CAP_RANGES.length,nA=CAP_RANGES.filter(r=>r.a!=null).length;
+  box.appendChild(el('div',{class:'lbl'},'Where the numbers are — '+N+' ranging'+(N>1?'s':'')+(N<2?' (range a second, different distance to confirm)':'')));
+  if(!all.length){box.appendChild(el('div',{class:'note'},'Not found in what the devices sent. Check the device is ticked and connected, then range again — or the value may be inside an encrypted or unlisted service (nRF Connect).'));return;}
+  const tb=el('tbody');
+  all.slice(0,12).forEach(h=>{const of=h.what==='angle'?nA:N,full=h.n===of;
+    tb.appendChild(el('tr',{class:full&&of>1?'hit':''},el('td',null,h.what),el('td',null,h.dev+' · '+h.ch),el('td',null,'bytes '+h.off+(h.len>1?'–'+(h.off+h.len-1):'')),el('td',null,h.enc+(h.eg?' (e.g. "'+h.eg+'")':'')+' · '+h.unit),el('td',null,h.n+' of '+of)));});
+  box.appendChild(el('div',{class:'capwrap'},el('table',{class:'capsum'},el('thead',null,el('tr',null,...['Value','Device · characteristic','Position','Encoding','Matched'].map(t=>el('th',null,t)))),tb)));
 }
 function capSession(){
   return{app:'SEN BLE Probe',version:VERSION,session:CAP.name,preset:CAP.preset,startedAt:new Date(CAP.t0).toISOString(),userAgent:navigator.userAgent,
     devices:DEVICES.filter(d=>CAP.devs.includes(d.n)).map(d=>({label:d.label,name:d.name,id:d.dev.id,profile:d.profile,
       services:[...d.svcs],characteristics:[...d.chars].map(([u,c])=>({uuid:u,service:c.service.uuid.toLowerCase(),props:['read','write','writeWithoutResponse','notify','indicate'].filter(k=>c.properties[k])}))})),
-    markers:CAP.markers,events:CAP.events};
+    markers:CAP.markers,ranges:CAP_RANGES.slice(),found:capFindAll().slice(0,20).map(h=>({...h,marks:undefined})),events:CAP.events};
 }
 function capText(){
   const s=capSession(),f=t=>(t/1000).toFixed(3).padStart(9);
@@ -1118,6 +1218,7 @@ for(const k in CAP_PRESETS)$('cappreset').appendChild(el('option',{value:k},CAP_
 $('cappreset').addEventListener('change',capRenderUI);
 $('capstart').addEventListener('click',capStart);
 $('capmarkbtn').addEventListener('click',()=>{capMark($('capmarktxt').value);$('capmarktxt').value='';});
+$('caprngbtn').addEventListener('click',capMarkRange);
 $('capmarktxt').addEventListener('keydown',e=>{if(e.key==='Enter'){capMark($('capmarktxt').value);$('capmarktxt').value='';}});
 $('capreadbtn').addEventListener('click',()=>capReadAll(false));
 $('capdumpbtn').addEventListener('click',capGattDump);
@@ -1132,6 +1233,7 @@ $('lnBc').addEventListener('input',e=>{LANE.bc=clampN(e.target.value,0.02,0.5,LA
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')laneStop();else if(!$('tab-lane').hidden)laneStart();});
 laneUI();
 {let t='devices';try{t=localStorage.getItem('sen_lab_tab')||t;}catch(e){}showTab(t);}
+try{const x=localStorage.getItem('sen_lab_extrasvc');if(x&&!$('extraSvc').value)$('extraSvc').value=x.slice(0,2000);}catch(e){}
 checkCaps().then(()=>log(null,'SEN BLE Probe V'+VERSION+' ready. '+CAPS.join(' · ')));
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(e=>log(null,'Service worker not registered: '+e.message,'er'));
 </script>

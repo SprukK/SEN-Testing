@@ -2,6 +2,21 @@
 
 `index.html` is always the current probe; each version is kept alongside it for rollback.
 
+## V1.5.0 — 2026-10-30
+- **Rangefinder prep (LAB-04 Vector Optics Paragon 7x25 Gen III / LAB-05 AEA HD7W-BC1500).** Neither maker publishes its Bluetooth protocol (the Vector talks to Applied Ballistics' Synapse SORD app, the AEA app is listed for iPhone only), so this release is about discovery.
+- **Wide service net (Add device, on by default):** Web Bluetooth only exposes services named before connecting. The chooser now names every 16-bit service in 1800–18FF, FE00–FEFF and FF00–FFFF, plus the 128-bit services of common BLE-serial modules (Dialog DSPS, u-blox, Laird VSP, Microchip MLDP, Silicon Labs BGX, Telink, Nordic template) — 780 in total. Blocklisted UUIDs are dropped by the browser itself (Web Bluetooth spec; WPT test `blocklisted-service-in-optionalServices`). Untick it if a chooser ever fails.
+- **Advertised but not reachable:** a device's advertised service UUIDs are compared with what GATT exposed. Missing ones show on its card with **Add them to the service list**; the list is kept (`sen_lab_extrasvc`) for the next + Add device. Service-data adverts are now recorded in captures too.
+- **Capture → Rangefinder preset** (power on, ranged near/far, aim up/down, unit and mode buttons, scan mode, Bluetooth button).
+- **Mark range + number finder:** after each ranging, type the distance the display shows (m or yd) and the angle, then tap **Mark range**. The finder searches what every ticked device sent since the previous range mark (max 60 s back, up to 2 s after) for that number in every common encoding:
+  - ASCII (decimal, or an integer ×10/×100);
+  - unsigned 16/24/32-bit integers LE/BE at ×1/×10/×100 (±1);
+  - BCD;
+  - float32 LE/BE.
+
+  It looks in the unit shown and the other unit (m ↔ yd), and for the angle signed. A table lists device · characteristic · byte position · encoding, with how many rangings matched; positions that match every time are highlighted. Range at least two different distances. The ranges and the finder result go into the JSON export.
+- Read-only as before: nothing is written to any device.
+- **Tests:** new `tests/rftest.js` (21 checks). Its simulated browser behaves like Chrome (unnamed services are hidden), with a binary FFE0 rangefinder and an ASCII rangefinder on an unlisted, advertised 128-bit service. probetest ALL PASS, capturetest 20/20, unlocktest ALL PASS, lanetest 23/23, maindatatest 13/13 (against Main V2.8.0). Real Chromium at 412 and 780 px: no sideways scroll, no errors.
+
 ## V1.4.0 — 2026-10-26
 - **Wind lane (new Lane tab, CORE-17 preview).** An animated top-down lane: firing point at the bottom and the target at the top, with two wind stations beside it (default S1 on the left at 10 %, S2 on the right at 60 %). Each station has a live arrow and coloured wind streaks across its part of the lane. A bullet dot runs along the sideways path, which each station's wind bends. The impact shows at the target in mm, MOA and mrad, together with time of flight and each station's share (drift with the other station calm).
 - **Settings:** lane length, MV, BC G7, and **Nearest station / Blend (linear)** between stations (an open CORE-17 question, now visible side by side).
