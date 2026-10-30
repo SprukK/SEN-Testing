@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#0a0c0f">
-<title>SEN BLE Probe V1.5.0</title>
+<title>SEN BLE Probe V1.6.0</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="probe-icon-192.png">
 <link rel="apple-touch-icon" href="probe-icon-192.png">
@@ -70,6 +70,17 @@ table.shots td:first-child,table.shots th:first-child{text-align:left}
 .tabbar{position:fixed;left:0;right:0;bottom:0;z-index:40;display:flex;gap:4px;padding:6px 8px calc(6px + env(safe-area-inset-bottom));background:rgba(10,12,15,.97);border-top:1px solid var(--border)}
 .tabbar button{flex:1 1 0;min-height:48px;font-size:11px;background:transparent;border-color:transparent}
 .tabbar button.on{background:var(--bg3);border-color:var(--accent);color:var(--accent);font-weight:600}
+/* V1.6.0 fold-aware second pane (same rules as Main CORE-18) */
+#lab-pane{display:none}
+html.fold body{max-width:none;margin:0;padding-right:calc(min(50vw,560px) + 18px)}
+html.fold #lab-pane{display:block;position:fixed;top:0;right:0;bottom:calc(58px + env(safe-area-inset-bottom));width:min(50vw,560px);overflow-y:auto;padding:12px 14px;background:var(--bg);border-left:1px solid var(--border);z-index:30}
+html.fold #lab-pane .log{height:calc(100vh - 230px)}
+html.fold.pane-cap #lab-pane .log{height:260px}
+html.fold.pane-none body{max-width:900px;margin:0 auto;padding-right:14px}
+html.fold.pane-none #lab-pane{display:none}
+.pane-sw{display:flex;gap:6px;margin-bottom:8px}.pane-sw:empty{display:none}
+.pane-sw button.on{border-color:var(--accent,#7eb8c4);color:var(--accent,#7eb8c4)}
+#pane-show{position:fixed;right:14px;bottom:calc(70px + env(safe-area-inset-bottom));z-index:41}
 .strip{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:-6px 0 12px;min-height:28px}
 .chip{min-height:30px;padding:4px 10px;font-size:11px;display:inline-flex;align-items:center;gap:6px;border-color:var(--c,var(--border))}
 #capmarks button{font-size:11px;padding:9px 11px}
@@ -88,7 +99,7 @@ pre.dump{font-size:10px;white-space:pre-wrap;word-break:break-all;color:var(--te
 </style>
 </head>
 <body>
-<h1>SEN · BLE Probe <span style="font-size:11px;color:var(--text3)">V1.5.0</span></h1>
+<h1>SEN · BLE Probe <span style="font-size:11px;color:var(--text3)">V1.6.0</span></h1>
 <div class="sub">Multi-device BLE diagnostic for the SEN platform. Device profiles: Calypso Mini (wind), FX Pocket Pro (chrono, GATT), FX True Ballistic (radar, GATT), FX Pocket V2/D1 (chrono, broadcast), Generic (anything else, e.g. a rangefinder). Chrome on Android or desktop, HTTPS only.</div>
 <div class="strip" id="strip" aria-label="Devices"></div>
 
@@ -151,7 +162,7 @@ pre.dump{font-size:10px;white-space:pre-wrap;word-break:break-all;color:var(--te
     <button class="sm" id="capreadbtn">Read all now</button><button class="sm" id="capdumpbtn">GATT dump</button>
     <span class="sp"></span><button class="sm" id="capsavebtn">Save .json</button><button class="sm" id="captxtbtn">Save .txt</button>
   </div>
-  <div class="capwrap"><table class="capsum"><thead><tr><th>Device · characteristic</th><th>#</th><th>Last value (hex)</th><th>Since last marker</th></tr></thead><tbody id="capsum"></tbody></table></div>
+  <div class="capwrap" id="capsumwrap"><table class="capsum"><thead><tr><th>Device · characteristic</th><th>#</th><th>Last value (hex)</th><th>Since last marker</th></tr></thead><tbody id="capsum"></tbody></table></div>
   <pre class="dump" id="capdump"></pre>
 </div>
 </section>
@@ -184,7 +195,7 @@ pre.dump{font-size:10px;white-space:pre-wrap;word-break:break-all;color:var(--te
 
 <section id="tab-log" hidden>
 <!-- LOG -->
-<div class="panel">
+<div class="panel" id="log-panel">
   <h2>Timeline log <span class="sp"></span>
     <button class="sm" id="pausebtn">Pause</button>
     <button class="sm" id="copybtn">Copy</button>
@@ -201,13 +212,15 @@ pre.dump{font-size:10px;white-space:pre-wrap;word-break:break-all;color:var(--te
 
 </section>
 
+<aside id="lab-pane" aria-label="Second pane"><div class="pane-sw" id="pane-sw"></div><div class="strip" id="strip-pane" aria-label="Devices"></div></aside>
+<button class="sm" id="pane-show" style="display:none" onclick="setPaneMode(curTab(),'log')">◧ Log</button>
 <nav class="tabbar" aria-label="Probe sections">
   <button id="tb-devices" class="on">Devices</button><button id="tb-capture">Capture</button><button id="tb-lane">Lane</button><button id="tb-log">Log</button><button id="tb-data">Data</button>
 </nav>
 
 <script>
 'use strict';
-const VERSION='1.5.0';
+const VERSION='1.6.0';
 const ISSC='49535343-fe7d-4ae5-8fa9-9fafd205e455';
 const NUS='6e400001-b5a3-f393-e0a9-e50e24dcca9e';
 const VRS='5445883a-3cab-42e5-b625-ca4e243f5a2c', VRS_VEL='5445883a-3cab-42e5-b625-ca4e243f5a2d', VRS_CMD='5445883a-3cab-42e5-b625-ca4e243f5a2e';
@@ -789,15 +802,52 @@ function showTab(t){
   if(!TABS.includes(t))t='devices';
   TABS.forEach(k=>{$('tab-'+k).hidden=k!==t;const b=$('tb-'+k);b.classList.toggle('on',k===t);b.setAttribute('aria-current',k===t?'page':'false');});
   try{localStorage.setItem('sen_lab_tab',t);}catch(e){}
+  if(twoPane)applyPane(t);   // V1.6.0
   if(t==='log')$('log').scrollTop=$('log').scrollHeight;
   if(t==='capture')capRefreshDevs();
   if(t==='lane')laneStart();else laneStop();
 }
 function renderStrip(){
-  const s=$('strip');if(!s)return;s.textContent='';
-  if(!DEVICES.length){s.appendChild(el('span',{class:'note',style:'margin:0'},'No devices'));return;}
-  DEVICES.forEach(d=>s.appendChild(el('button',{class:'chip',style:'--c:'+d.color,onclick:()=>{showTab('devices');d.ui.card.scrollIntoView&&d.ui.card.scrollIntoView({block:'start'});}},
-    el('span',{class:'dot'+(d.connected?' on':'')}),d.label+(CAP.on?' ●':''))));
+  ['strip','strip-pane'].forEach(id=>{const s=$(id);if(!s)return;s.textContent='';   // V1.6.0: also at the top of the second pane
+    if(!DEVICES.length){s.appendChild(el('span',{class:'note',style:'margin:0'},'No devices'));return;}
+    DEVICES.forEach(d=>s.appendChild(el('button',{class:'chip',style:'--c:'+d.color,onclick:()=>{showTab('devices');d.ui.card.scrollIntoView&&d.ui.card.scrollIntoView({block:'start'});}},
+      el('span',{class:'dot'+(d.connected?' on':'')}),d.label+(CAP.on?' ●':''))));});
+}
+/* ---------- V1.6.0 fold-aware second pane ----------
+   Unfolded (near-square touch screen ≥ 600 px, or a wide screen ≥ 560 px tall) the Lab shows two halves: the
+   tab on the left, and on the right what helps with it — Devices: the live log; Capture: the capture results
+   (where-the-numbers-are finder, byte-change table, GATT dump) with the log under them; Lane / Data: nothing
+   (full width, a ◧ Log button brings the log); Log: full width in its own tab. A switch at the top of the
+   pane changes it, remembered per tab (sen_lab_panes). Blocks are MOVED, never copied, so connections, the
+   log and a running capture carry on; everything goes back on folding. The outer screen is unchanged. */
+const PANE_MODES={devices:['log','cap'],capture:['cap','log'],lane:['none','log'],data:['none','log'],log:['none']};
+const PANE_BLOCKS={log:['log-panel'],cap:['capfind','capsumwrap','capdump','log-panel']};
+const PANE_LABEL={log:'Log',cap:'Capture results',none:'Hide'};
+let twoPane=false,paneShown=null,PANES={};
+try{const j=JSON.parse(localStorage.getItem('sen_lab_panes')||'{}');if(j&&typeof j==='object'&&!Array.isArray(j))PANES=j;}catch(e){}
+const curTab=()=>TABS.find(k=>!$('tab-'+k).hidden)||'devices';
+function labLayoutMode(w,h,coarse){if(w<600)return'phone';const r=w/h;return coarse&&r>=0.8&&r<=1.25?'inner':'wide';}
+const labCoarse=()=>window.matchMedia?matchMedia('(pointer: coarse)').matches:('ontouchstart' in window);
+function paneMode(t){const m=PANE_MODES[t]||['none'],c=PANES[t];return m.includes(c)?c:m[0];}
+function paneOut(){document.querySelectorAll('[data-pane-home]').forEach(mk=>{const e=$(mk.dataset.paneHome);if(e)mk.replaceWith(e);else mk.remove();});}
+function paneIn(ids){const pane=$('lab-pane');ids.forEach(id=>{const e=$(id);if(!e||e.parentNode===pane)return;const mk=document.createElement('span');mk.hidden=true;mk.dataset.paneHome=id;e.before(mk);pane.appendChild(e);});}
+function applyPane(t){
+  paneOut();
+  const m=twoPane?paneMode(t):null;paneShown=m;
+  const root=document.documentElement;root.classList.toggle('pane-none',m==='none');root.classList.toggle('pane-cap',m==='cap');
+  if(m&&m!=='none')paneIn(PANE_BLOCKS[m]);
+  const sw=$('pane-sw'),modes=PANE_MODES[t]||['none'];
+  sw.replaceChildren(...(m&&modes.length>1?modes.map(x=>el('button',{class:'sm'+(x===m?' on':''),'aria-pressed':String(x===m),onclick:()=>setPaneMode(t,x)},PANE_LABEL[x])):[]));
+  $('pane-show').style.display=m==='none'&&modes.length>1?'':'none';
+  if(m){const lg=$('log');lg.scrollTop=lg.scrollHeight;}
+}
+function setPaneMode(t,m){if(!(PANE_MODES[t]||[]).includes(m))return;PANES={...PANES,[t]:m};try{localStorage.setItem('sen_lab_panes',JSON.stringify(PANES));}catch(e){}applyPane(t);}
+function applyLabLayout(){
+  const mode=labLayoutMode(window.innerWidth,window.innerHeight,labCoarse()),two=mode==='inner'||(mode==='wide'&&window.innerHeight>=560);
+  if(two===twoPane)return;
+  twoPane=two;document.documentElement.classList.toggle('fold',two);
+  if(!two)document.documentElement.classList.remove('pane-none','pane-cap');
+  applyPane(curTab());
 }
 
 /* ---------- wind lane (V1.4.0, CORE-17 preview) ----------
@@ -1233,6 +1283,7 @@ $('lnBc').addEventListener('input',e=>{LANE.bc=clampN(e.target.value,0.02,0.5,LA
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')laneStop();else if(!$('tab-lane').hidden)laneStart();});
 laneUI();
 {let t='devices';try{t=localStorage.getItem('sen_lab_tab')||t;}catch(e){}showTab(t);}
+applyLabLayout();let _lyT=null;window.addEventListener('resize',()=>{clearTimeout(_lyT);_lyT=setTimeout(applyLabLayout,120);});
 try{const x=localStorage.getItem('sen_lab_extrasvc');if(x&&!$('extraSvc').value)$('extraSvc').value=x.slice(0,2000);}catch(e){}
 checkCaps().then(()=>log(null,'SEN BLE Probe V'+VERSION+' ready. '+CAPS.join(' · ')));
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(e=>log(null,'Service worker not registered: '+e.message,'er'));

@@ -2,6 +2,18 @@
 
 `index.html` is always the current probe; each version is kept alongside it for rollback.
 
+## V1.6.0 — 2026-10-30
+- **Fold-aware layout (Honor Magic V5 inner screen), same rules as Main's CORE-18.** Unfolded, the Lab shows two halves: the tab on the left, and on the right what helps with that tab.
+  - **Devices:** the live log, so connections and discovery scroll by next to the device cards.
+  - **Capture:** the capture results (the "where the numbers are" finder, the byte-change table, the GATT dump) with the log under them. Markers and Mark range go on the left; you see which bytes moved on the right.
+  - **Lane / Data:** full width, with a **◧ Log** button to bring the log in.
+  - **Log:** full width in its own tab.
+- **Switch at the top of the right half** (Log | Capture results, or Hide | Log), remembered per tab (`sen_lab_panes`, Lab namespace; unknown values fall back to the tab default).
+- The device status strip also shows at the top of the right half.
+- **Where two halves apply:** the inner screen in both orientations, and desktop/tablet screens at least 560 px tall. The outer screen and landscape phones stay single column, exactly as before.
+- **Blocks are moved, never copied,** so device connections, the log and a running capture carry on untouched. Everything goes back to its exact place on every tab change and on folding, including in the middle of a capture.
+- **Tests:** new `tests/foldtest.js` (25 checks). probetest ALL PASS, capturetest 20/20, unlocktest ALL PASS, lanetest 23/23, rftest 21/21, maindatatest 13/13. Real Chromium at 412 × 915, 780 × 880 and 880 × 780, every tab: no sideways scroll, no errors.
+
 ## V1.5.0 — 2026-10-30
 - **Rangefinder prep (LAB-04 Vector Optics Paragon 7x25 Gen III / LAB-05 AEA HD7W-BC1500).** Neither maker publishes its Bluetooth protocol (the Vector talks to Applied Ballistics' Synapse SORD app, the AEA app is listed for iPhone only), so this release is about discovery.
 - **Wide service net (Add device, on by default):** Web Bluetooth only exposes services named before connecting. The chooser now names every 16-bit service in 1800–18FF, FE00–FEFF and FF00–FFFF, plus the 128-bit services of common BLE-serial modules (Dialog DSPS, u-blox, Laird VSP, Microchip MLDP, Silicon Labs BGX, Telink, Nordic template) — 780 in total. Blocklisted UUIDs are dropped by the browser itself (Web Bluetooth spec; WPT test `blocklisted-service-in-optionalServices`). Untick it if a chooser ever fails.
