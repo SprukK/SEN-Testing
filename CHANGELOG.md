@@ -2,6 +2,14 @@
 
 `index.html` is always the current probe; each version is kept alongside it for rollback.
 
+## V1.6.1 — 2026-10-31
+- **Fix: the Calypso profile could write to other devices.** It was picked by name (`WDOT-…`) *or* by shape (FFF1 + FFF2). FFF1/FFF2 on the ISSC service is a stock module layout, and the Vector Paragon 7x25 Gen III rangefinder (SCRF-S24) has it too. With "Auto-initialise known profiles" ticked, the Lab sent the full Calypso handshake to the Vector.
+  - The Calypso is now picked **by name only**. Every other device gets the generic profile, which is read-only.
+  - Choosing Calypso by hand on a card still sends the handshake. That is a deliberate choice, and the log marks it as manual.
+  - The "untick Auto-initialise" workaround is no longer needed.
+- **Garmin multi-link service built in** (`6a4e2800-667b-11e3-949a-0800200c9a66`, Xero C1 snoop 2026-10-30). It is named in the chooser with or without the wide service net, so the service is visible. Nothing is written to it. The Xero C1 sends no live data and stays manual/CSV.
+- **Tests:** new `tests/matchtest.js` (11 checks). Against V1.6.0 it fails 6, which reproduces the bug: the Vector gets the Calypso profile and receives the full handshake. probetest ALL PASS, capturetest 20/20, unlocktest ALL PASS, lanetest 23/23, rftest 21/21, foldtest 25/25, maindatatest 13/13 (against Main V2.8.0).
+
 ## V1.6.0 — 2026-10-30
 - **Fold-aware layout (Honor Magic V5 inner screen), same rules as Main's CORE-18.** Unfolded, the Lab shows two halves: the tab on the left, and on the right what helps with that tab.
   - **Devices:** the live log, so connections and discovery scroll by next to the device cards.

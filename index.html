@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#0a0c0f">
-<title>SEN BLE Probe V1.6.0</title>
+<title>SEN BLE Probe V1.6.1</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="probe-icon-192.png">
 <link rel="apple-touch-icon" href="probe-icon-192.png">
@@ -99,7 +99,7 @@ pre.dump{font-size:10px;white-space:pre-wrap;word-break:break-all;color:var(--te
 </style>
 </head>
 <body>
-<h1>SEN · BLE Probe <span style="font-size:11px;color:var(--text3)">V1.6.0</span></h1>
+<h1>SEN · BLE Probe <span style="font-size:11px;color:var(--text3)">V1.6.1</span></h1>
 <div class="sub">Multi-device BLE diagnostic for the SEN platform. Device profiles: Calypso Mini (wind), FX Pocket Pro (chrono, GATT), FX True Ballistic (radar, GATT), FX Pocket V2/D1 (chrono, broadcast), Generic (anything else, e.g. a rangefinder). Chrome on Android or desktop, HTTPS only.</div>
 <div class="strip" id="strip" aria-label="Devices"></div>
 
@@ -122,7 +122,7 @@ pre.dump{font-size:10px;white-space:pre-wrap;word-break:break-all;color:var(--te
   <input id="extraSvc" placeholder="from nRF Connect, e.g. fff0, 0000ffe0-0000-1000-8000-00805f9b34fb" onchange="extraSave()">
   <div class="lbl">Extra manufacturer company IDs for adverts (hex)</div>
   <input id="extraMfr" placeholder="e.g. 004c, 0499">
-  <div class="note">Web Bluetooth only exposes services listed before connecting. Built in: ISSC UART (Calypso), FX VRS (Pocket Pro), FX True Ballistic, Nordic UART, FFF0/FFE0/FFE5/FFB0/FFD0, battery, device info, ESS, DFU. For an unknown device, read its service UUIDs in nRF Connect and paste them above before adding it.</div>
+  <div class="note">Web Bluetooth only exposes services listed before connecting. Built in: ISSC UART (Calypso), FX VRS (Pocket Pro), FX True Ballistic, Garmin (Xero), Nordic UART, FFF0/FFE0/FFE5/FFB0/FFD0, battery, device info, ESS, DFU. For an unknown device, read its service UUIDs in nRF Connect and paste them above before adding it.</div>
   <details open><summary>Browser capabilities</summary><div class="caps" id="caps"></div></details>
 </div>
 
@@ -220,13 +220,16 @@ pre.dump{font-size:10px;white-space:pre-wrap;word-break:break-all;color:var(--te
 
 <script>
 'use strict';
-const VERSION='1.6.0';
+const VERSION='1.6.1';
 const ISSC='49535343-fe7d-4ae5-8fa9-9fafd205e455';
 const NUS='6e400001-b5a3-f393-e0a9-e50e24dcca9e';
 const VRS='5445883a-3cab-42e5-b625-ca4e243f5a2c', VRS_VEL='5445883a-3cab-42e5-b625-ca4e243f5a2d', VRS_CMD='5445883a-3cab-42e5-b625-ca4e243f5a2e';
 const TB='00001623-88ec-688c-644b-3fa706c0bb76', TB_SHOT='00001624-88ec-688c-644b-3fa706c0bb76', TB_BATT='00001627-88ec-688c-644b-3fa706c0bb76', TB_3P='0000162b-88ec-688c-644b-3fa706c0bb76', TB_STREAM='00001626-88ec-688c-644b-3fa706c0bb76';
 const FFF1='0000fff1-0000-1000-8000-00805f9b34fb', FFF2='0000fff2-0000-1000-8000-00805f9b34fb', BATT='00002a19-0000-1000-8000-00805f9b34fb';
-const BASE_SVCS=[ISSC,NUS,VRS,TB,0xFFF0,0xFFE0,0xFFE5,0xFFB0,0xFFD0,0xFEE7,0xFE59,0x180F,0x180A,0x1800,0x1801,0x181A,0x1530];
+/* V1.6.1: Garmin multi-link service (Xero C1 and other Garmin devices, 2026-10-30 snoop). Named only so the
+   chooser exposes it; nothing is written to it. */
+const GARMIN='6a4e2800-667b-11e3-949a-0800200c9a66';
+const BASE_SVCS=[ISSC,NUS,VRS,TB,GARMIN,0xFFF0,0xFFE0,0xFFE5,0xFFB0,0xFFD0,0xFEE7,0xFE59,0x180F,0x180A,0x1800,0x1801,0x181A,0x1530];
 const BASE_MFR=[0x0059];
 /* V1.5.0 (LAB-04/05 prep): Web Bluetooth shows only services named before connecting, and a rangefinder's
    protocol service is unknown. The wide net names every 16-bit UUID in the standard (1800–18FF), member
@@ -434,7 +437,9 @@ function parseFxBroadcast(b){ // manufacturer data (company 0x0059 stripped)
 const PROFILES={
   calypso:{
     name:'Calypso Mini (wind)',
-    match:(d)=>/^WDOT-/i.test(d.name)||(d.chars.has(FFF1)&&d.chars.has(FFF2)),
+    // V1.6.1: by name only. FFF1/FFF2 on the ISSC service is a stock module layout (the Vector Paragon
+    // rangefinder has it too) and auto-init writes the handshake, so a shape match wrote to a foreign device.
+    match:(d)=>/^WDOT-/i.test(d.name||''),
     need:[FFF2],
     ui(d,box){
       const t={live:el('span',{class:'tag'}),spd:tile('Instant','m/s'),avg:tile('Average','m/s'),dir:tile('Direction','deg'),batt:tile('Battery 2A19','%'),gk:tile(':GK id / f2'),fw:tile('Firmware :VR'),wu:tile(':WU frames'),ak:tile(':AK acks'),na:tile(':NA rejects'),idle:tile('HDLC idle')};
