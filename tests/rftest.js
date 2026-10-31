@@ -29,7 +29,7 @@ function mkDev(name,id,svcDefs,advUuids){
   return dev;
 }
 const V=mkDev('Paragon RF','idV',[{uuid:full(0xffe0),chars:[{uuid:full(0xffe1),props:{notify:true}}]}]);
-const A=mkDev('BC1500','idA',[{uuid:ASVC,chars:[{uuid:ACHR,props:{notify:true}}]}],[ASVC]);
+const A=mkDev('ASCII-RF','idA',[{uuid:ASVC,chars:[{uuid:ACHR,props:{notify:true}}]}],[ASVC]);
 const binRange=(m,ang)=>{const d=Math.round(m*10),a=Math.round(ang*10)&0xffff;return[0xaa,0x01,d&255,d>>8,a&255,a>>8,0x55];};
 let queue=[],lastOpts=null;
 const dom=new JSDOM(fs.readFileSync(FILE,'utf8'),{runScripts:'dangerously',pretendToBeVisual:true,url:'https://sprukk.github.io/SEN-Testing/',beforeParse(w){
@@ -53,7 +53,7 @@ chk('chooser names every 16-bit service 1800–18FF, FE00–FEFF, FF00–FFFF pl
 chk('Binary RF: FFE0 reachable through the net and FFE1 subscribed',/ffe0/.test(d.querySelector('.dev .disco').textContent)&&/Subscribed|subscribed/.test($('log').textContent));
 // 2. ASCII RF: unlisted 128-bit service → hidden, advertised → one tap → reachable next time.
 queue.push(A);click($('addbtn'));await sleep(900);
-const cardA=[...d.querySelectorAll('.dev')].find(c=>/BC1500/.test(c.textContent));
+const cardA=[...d.querySelectorAll('.dev')].find(c=>/ASCII-RF/.test(c.textContent));
 chk('ASCII RF: its 128-bit service is not reachable on the first connect (not named)',!cardA.querySelector('.disco').textContent.includes(ASVC));
 A.advert();await sleep(50);
 const advBtn=[...cardA.querySelectorAll('button')].find(b=>/Add them to the service list/.test(b.textContent));
@@ -62,7 +62,7 @@ click(advBtn);
 chk('tap → added to the extra service list and kept for next time',$('extraSvc').value.includes(ASVC)&&w.localStorage.getItem('sen_lab_extrasvc').includes(ASVC));
 click([...cardA.querySelectorAll('button')].find(b=>b.textContent==='Remove'));await sleep(50);
 queue.push(A);click($('addbtn'));await sleep(900);
-const cardA2=[...d.querySelectorAll('.dev')].find(c=>/BC1500/.test(c.textContent));
+const cardA2=[...d.querySelectorAll('.dev')].find(c=>/ASCII-RF/.test(c.textContent));
 chk('added again → the 128-bit service and its notify characteristic are reachable',cardA2.querySelector('.disco').textContent.includes(ASVC)&&cardA2.querySelector('.disco').textContent.includes(ACHR));
 // 3. Capture with the rangefinder preset.
 click($('tb-capture'));await sleep(20);

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#0a0c0f">
-<title>SEN BLE Probe V1.6.1</title>
+<title>SEN BLE Probe V1.7.0</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="probe-icon-192.png">
 <link rel="apple-touch-icon" href="probe-icon-192.png">
@@ -99,8 +99,8 @@ pre.dump{font-size:10px;white-space:pre-wrap;word-break:break-all;color:var(--te
 </style>
 </head>
 <body>
-<h1>SEN · BLE Probe <span style="font-size:11px;color:var(--text3)">V1.6.1</span></h1>
-<div class="sub">Multi-device BLE diagnostic for the SEN platform. Device profiles: Calypso Mini (wind), FX Pocket Pro (chrono, GATT), FX True Ballistic (radar, GATT), FX Pocket V2/D1 (chrono, broadcast), Generic (anything else, e.g. a rangefinder). Chrome on Android or desktop, HTTPS only.</div>
+<h1>SEN · BLE Probe <span style="font-size:11px;color:var(--text3)">V1.7.0</span></h1>
+<div class="sub">Multi-device BLE diagnostic for the SEN platform. Device profiles: Calypso Mini (wind), FX Pocket Pro (chrono, GATT), FX True Ballistic (radar, GATT), FX Pocket V2/D1 (chrono, broadcast), LabRadar LX (chrono), Element Titan / Helix and AEA BC1500 (rangefinders), Generic (anything else). Chrome on Android or desktop, HTTPS only.</div>
 <div class="strip" id="strip" aria-label="Devices"></div>
 
 <section id="tab-devices">
@@ -113,7 +113,7 @@ pre.dump{font-size:10px;white-space:pre-wrap;word-break:break-all;color:var(--te
     <button id="knownbtn" style="flex:1 1 auto">Reconnect known devices</button>
   </div>
   <label class="ck"><input type="checkbox" id="optGatt" checked> Connect GATT (untick for broadcast-only devices: adverts are watched instead)</label>
-  <label class="ck"><input type="checkbox" id="optInit" checked> Auto-initialise known profiles (Calypso handshake + keepalive)</label>
+  <label class="ck"><input type="checkbox" id="optInit" checked> Auto-initialise known profiles (Calypso handshake + keepalive, LabRadar start sequence + status poll)</label>
   <label class="ck"><input type="checkbox" id="optSubAll" checked> Subscribe to every notify/indicate characteristic</label>
   <label class="ck"><input type="checkbox" id="optRead" checked> Read every readable characteristic once</label>
   <label class="ck"><input type="checkbox" id="optAds"> Also watch advertisements after connecting</label>
@@ -122,7 +122,7 @@ pre.dump{font-size:10px;white-space:pre-wrap;word-break:break-all;color:var(--te
   <input id="extraSvc" placeholder="from nRF Connect, e.g. fff0, 0000ffe0-0000-1000-8000-00805f9b34fb" onchange="extraSave()">
   <div class="lbl">Extra manufacturer company IDs for adverts (hex)</div>
   <input id="extraMfr" placeholder="e.g. 004c, 0499">
-  <div class="note">Web Bluetooth only exposes services listed before connecting. Built in: ISSC UART (Calypso), FX VRS (Pocket Pro), FX True Ballistic, Garmin (Xero), Nordic UART, FFF0/FFE0/FFE5/FFB0/FFD0, battery, device info, ESS, DFU. For an unknown device, read its service UUIDs in nRF Connect and paste them above before adding it.</div>
+  <div class="note">Web Bluetooth only exposes services listed before connecting. Built in: ISSC UART (Calypso), FX VRS (Pocket Pro), FX True Ballistic, Garmin (Xero), LabRadar LX, DSPS (AEA), Nordic UART (Element), FFF0/FFE0/FFE5/FFB0/FFD0, battery, device info, ESS, DFU. For an unknown device, read its service UUIDs in nRF Connect and paste them above before adding it.</div>
   <details open><summary>Browser capabilities</summary><div class="caps" id="caps"></div></details>
 </div>
 
@@ -220,7 +220,7 @@ pre.dump{font-size:10px;white-space:pre-wrap;word-break:break-all;color:var(--te
 
 <script>
 'use strict';
-const VERSION='1.6.1';
+const VERSION='1.7.0';
 const ISSC='49535343-fe7d-4ae5-8fa9-9fafd205e455';
 const NUS='6e400001-b5a3-f393-e0a9-e50e24dcca9e';
 const VRS='5445883a-3cab-42e5-b625-ca4e243f5a2c', VRS_VEL='5445883a-3cab-42e5-b625-ca4e243f5a2d', VRS_CMD='5445883a-3cab-42e5-b625-ca4e243f5a2e';
@@ -229,7 +229,14 @@ const FFF1='0000fff1-0000-1000-8000-00805f9b34fb', FFF2='0000fff2-0000-1000-8000
 /* V1.6.1: Garmin multi-link service (Xero C1 and other Garmin devices, 2026-10-30 snoop). Named only so the
    chooser exposes it; nothing is written to it. */
 const GARMIN='6a4e2800-667b-11e3-949a-0800200c9a66';
-const BASE_SVCS=[ISSC,NUS,VRS,TB,GARMIN,0xFFF0,0xFFE0,0xFFE5,0xFFB0,0xFFD0,0xFEE7,0xFE59,0x180F,0x180A,0x1800,0x1801,0x181A,0x1530];
+/* V1.7.0 device profiles (owner captures 2026-10-30/31). Element Titan 3K / Helix 1.5K: Nordic UART, notify 6e400003.
+   AEA BC1500: Dialog DSPS, notify …5cb8. LabRadar LX: own service; commands on bf03260c, responses + events on
+   18cda784, a87988b9 enable byte. */
+const NUS_TX='6e400003-b5a3-f393-e0a9-e50e24dcca9e';
+const DSPS='0783b03e-8535-b5a0-7140-a304d2495cb7', DSPS_TX='0783b03e-8535-b5a0-7140-a304d2495cb8';
+const LR_SVC='da2b84f1-6279-48de-bdc0-afbea0226079', LR_CMD='bf03260c-7205-4c25-af43-93b1c299d159',
+  LR_EVT='18cda784-4bd3-4370-85bb-bfed91ec86af', LR_EN='a87988b9-694c-479c-900e-95dfa6c00a24';
+const BASE_SVCS=[ISSC,NUS,VRS,TB,GARMIN,DSPS,LR_SVC,0xFFF0,0xFFE0,0xFFE5,0xFFB0,0xFFD0,0xFEE7,0xFE59,0x180F,0x180A,0x1800,0x1801,0x181A,0x1530];
 const BASE_MFR=[0x0059];
 /* V1.5.0 (LAB-04/05 prep): Web Bluetooth shows only services named before connecting, and a rangefinder's
    protocol service is unknown. The wide net names every 16-bit UUID in the standard (1800–18FF), member
@@ -252,7 +259,7 @@ const CAL_UNLOCK={'WDOT-B1F9A6':':DU,1668647648,A7','WDOT-E2896A':':DU,180234707
 const HANDSHAKE=[':GK',':PS,1,1,9F',':WU,5',':WU,6',':VR']; // sent after the :DU unlock
 const KEEPALIVE=':CC,6,86';
 const COLORS=['#7eb8c4','#c8a96e','#d9b3ff','#7ab87a','#ff9ed8','#e07a5f','#9fb4ff','#e6d36b'];
-const NAMES={[FFF1]:'FFF1 cmd',[FFF2]:'FFF2 data',[BATT]:'2A19 batt',[VRS_VEL]:'VRS velocity',[VRS_CMD]:'VRS cmd',[TB_SHOT]:'TB shot',[TB_BATT]:'TB batt',[TB_3P]:'TB 3rd-party',[TB_STREAM]:'TB stream','00001625-88ec-688c-644b-3fa706c0bb76':'TB cmd'};
+const NAMES={[NUS_TX]:'NUS TX',[DSPS_TX]:'DSPS TX',[LR_CMD]:'LR cmd',[LR_EVT]:'LR evt',[LR_EN]:'LR enable',[FFF1]:'FFF1 cmd',[FFF2]:'FFF2 data',[BATT]:'2A19 batt',[VRS_VEL]:'VRS velocity',[VRS_CMD]:'VRS cmd',[TB_SHOT]:'TB shot',[TB_BATT]:'TB batt',[TB_3P]:'TB 3rd-party',[TB_STREAM]:'TB stream','00001625-88ec-688c-644b-3fa706c0bb76':'TB cmd'};
 const FPS=0.3048;
 const $=id=>document.getElementById(id);
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
@@ -398,6 +405,30 @@ function renderShots(d){
   }
 }
 
+/* V1.7.0 rangefinder UI: rangings in metres (yards shown alongside), angle in whole degrees as sent */
+function buildRangeUI(d,box,note){
+  const t={n:tile('Rangings'),m:tile('Distance','m'),deg:tile('Angle','°')};
+  box.appendChild(el('div',{class:'scs'},t.n,t.m,t.deg));
+  const tb=el('tbody');
+  box.appendChild(el('div',{class:'shotwrap'},el('table',{class:'shots'},el('thead',null,el('tr',null,...['#','Time','m','yd','Angle °','Sent'].map(h=>el('th',null,h)))),tb)));
+  box.appendChild(el('div',{class:'row',style:'margin-top:8px'},el('button',{class:'sm warn',onclick:()=>{d.ranges=[];renderRanges(d);log(d,'Rangings cleared.');}},'Clear')));
+  box.appendChild(el('div',{class:'note'},note));
+  d.ui.rng={t,tb};renderRanges(d);
+}
+function addRange(d,r){
+  if(!(r.m>0&&r.m<5000)){log(d,'  rejected implausible distance '+r.m,'er');return;}
+  d.ranges=d.ranges||[];d.ranges.push({m:r.m,deg:r.deg,raw:r.raw,t:ts().slice(0,8)});
+  log(d,'RANGE #'+d.ranges.length+'  '+r.m.toFixed(1)+' m'+(r.deg!=null?'  '+(r.deg>0?'+':'')+r.deg+'°':'  (no angle)')+'  ['+r.raw+']','shot');
+  renderRanges(d);
+}
+function renderRanges(d){
+  const u=d.ui.rng;if(!u)return;const R=d.ranges||[],L=R[R.length-1];
+  u.t.n.v.textContent=R.length;u.t.m.v.textContent=L?L.m.toFixed(1):'—';u.t.deg.v.textContent=L&&L.deg!=null?(L.deg>0?'+':'')+L.deg:'—';
+  u.tb.textContent='';
+  for(let i=R.length-1;i>=Math.max(0,R.length-100);i--){const x=R[i];
+    u.tb.appendChild(el('tr',null,el('td',null,String(i+1)),el('td',null,x.t),el('td',null,x.m.toFixed(1)),el('td',null,(x.m/YD).toFixed(1)),el('td',null,x.deg!=null?String(x.deg):'—'),el('td',null,x.raw)));}
+}
+
 /* ---------- protocol parsers ---------- */
 function asciiBytes(s,term){const o=[];for(const ch of s)o.push(ch.charCodeAt(0)&0xff);return new Uint8Array([...o,...term]);}
 const FX_DRAG=['none','G1','G7','RA4','GA'];
@@ -431,6 +462,60 @@ function parseFxBroadcast(b){ // manufacturer data (company 0x0059 stripped)
   if(b.length<15||b[0]!==0x30)return null;
   const model=FX_BCAST_UUID[hexOf(b.slice(6,10)).replace(/ /g,'')];if(!model)return null;
   return {model,fwMajor:b[2]|(b[3]<<8),fwMinor:b[4],batt:b[10],counter:(b[11]<<8)|b[12],fps:(b[13]<<8)|b[14]};
+}
+
+/* ---------- V1.7.0 rangefinder parsers (YD = 0.9144 m, declared with the capture finder) ---------- */
+function parseElement(b){ // F5 · distance uint16 BE ×0.1 m (always metres) · angle int8 whole degrees
+  if(b.length!==4||b[0]!==0xF5)return null;
+  return{m:((b[1]<<8)|b[2])/10,deg:b[3]>127?b[3]-256:b[3]};
+}
+function aeaDist(v){const m=/^\s*([\d.]+)\s*([my])\s*$/i.exec(String(v));if(!m)return null;const x=parseFloat(m[1]);
+  return isFinite(x)?{m:/y/i.test(m[2])?x*YD:x,raw:m[1]+m[2].toLowerCase()}:null;}
+function aeaLine(st,line){ // returns a finished ranging or null; st carries a distance waiting for its angle
+  let m;
+  if(line.startsWith('#point#')){
+    let j=null;try{j=JSON.parse(line.slice(7));}catch(e){return null;}
+    const dd=j&&aeaDist(j.distance),a=j?Number(j.angle):NaN;
+    return dd&&isFinite(a)?{m:dd.m,deg:a,raw:dd.raw,fmt:'JSON'}:null;
+  }
+  if((m=/Dist\s*:\s*([\d.]+\s*[my])/i.exec(line))){const dd=aeaDist(m[1]);const prev=st.pend;st.pend=dd;return prev?{m:prev.m,deg:null,raw:prev.raw,fmt:'text'}:null;}
+  if((m=/Angle\s*:\s*([+-]?\d+(?:\.\d+)?)/i.exec(line))&&st.pend){const r={m:st.pend.m,deg:parseFloat(m[1]),raw:st.pend.raw,fmt:'text'};st.pend=null;return r;}
+  return null;
+}
+/* ---------- V1.7.0 LabRadar LX frames ----------
+   01 · cmd · seq u16 BE · len u32 BE · payload · CRC16 BE. Reply = cmd|0x80; events carry seq 0.
+   CRC: reflected CCITT polynomial (0x8408), init 0xBEEF, final XOR 0xFFFF, over the whole frame before the CRC —
+   found from the owner's snoops and checked on all 341 frames of both sessions. */
+function lrCrc(b){let c=0xBEEF;for(const x of b){c^=x;for(let i=0;i<8;i++)c=(c&1)?(c>>>1)^0x8408:c>>>1;}return (c^0xFFFF)&0xFFFF;}
+function lrFrame(cmd,seq,payload){
+  const p=payload||[],L=p.length;
+  const f=[1,cmd,(seq>>8)&255,seq&255,(L>>>24)&255,(L>>16)&255,(L>>8)&255,L&255,...p];const c=lrCrc(f);
+  return new Uint8Array([...f,c>>8,c&255]);
+}
+/* 64-byte block the LabRadar app sends as cmd 0x1A right after cmd 0x06. Byte-identical in two sessions a day
+   apart (30 + 31 Oct 2026), and the 0x86 reply before it is identical too, so it is a fixed app key, not an
+   answer to a challenge. Answer 0x9A 00 = accepted. */
+const LR_KEY=[0x72,0xd5,0x64,0xce,0x01,0xf0,0xe2,0x6a,0x7b,0x32,0x3b,0x6c,0x9c,0x30,0xa2,0x0a,0x86,0x5b,0x44,0x49,0x08,0x81,0x5e,0x50,0x9c,0x65,0x3c,0x7f,0x3b,0x89,0x7f,0x6f,
+  0x11,0x34,0x12,0x6c,0x75,0x0d,0x7f,0xf1,0x79,0x85,0x77,0xa1,0x56,0xa0,0x2e,0x2b,0xf9,0x85,0x52,0x3f,0xa2,0xa3,0xc8,0xe6,0xa2,0x88,0xf0,0xe1,0x09,0x52,0x4f,0xe9];
+function lrTake(st,b){ // reassemble frames across notifications; returns complete frames, drops junk and bad CRCs
+  st.lrBuf=(st.lrBuf||[]).concat(Array.from(b));const out=[];
+  for(;;){
+    const B=st.lrBuf;let i=B.indexOf(1);if(i<0){st.lrBuf=[];break;}if(i>0)B.splice(0,i);
+    if(B.length<10)break;
+    const L=((B[4]<<24)>>>0)+(B[5]<<16)+(B[6]<<8)+B[7];
+    if(L>4096){B.splice(0,1);continue;}
+    if(B.length<10+L)break;
+    const f=B.splice(0,10+L);
+    if(lrCrc(f.slice(0,-2))!==((f[f.length-2]<<8)|f[f.length-1])){out.push({bad:true,f});continue;}
+    out.push({cmd:f[1],seq:(f[2]<<8)|f[3],p:f.slice(8,-2)});
+  }
+  return out;
+}
+function lrShot(p){ // event 0x20: 15 float32 BE (−1 = unused) + 6 bytes; mapped against the LabRadar CSV export
+  if(p.length<66)return null;
+  const v=new DataView(new Uint8Array(p).buffer),f=i=>v.getFloat32(i*4,false);
+  const o={dist:f(0),v0:f(5),vd:f(6),pf:f(11),massG:f(12),series:(p[61]<<8)|p[62],shot:p[63]};
+  return o.v0>0?o:null;
 }
 
 /* ---------- profiles ---------- */
@@ -520,6 +605,64 @@ const PROFILES={
       if(p.counter!==d.st.lastCounter&&p.fps>0){d.st.lastCounter=p.counter;addShot(d,p.fps*FPS,[],'advert ctr '+p.counter);}
     }
   },
+  element:{ // V1.7.0, LAB-04. Read-only.
+    name:'Element Titan / Helix (rangefinder)',
+    match:(d)=>/^(titan|helix|element)/i.test(d.name||'')||d.chars.has(NUS_TX), // NUS is generic, but this profile never writes
+    need:[NUS_TX],
+    ui(d,box){buildRangeUI(d,box,'Nordic UART notify, 4 bytes per ranging: F5 · distance uint16 BE in 0.1 m · angle int8 °. Always metres over Bluetooth, whatever the display unit. The unit sends the distance of the mode on its display (LOS or HCD, no flag) → keep it in LOS. Nothing is written to the rangefinder.');},
+    rx(d,uuid,b){
+      if(uuid!==NUS_TX)return;
+      const r=parseElement(b);if(!r){log(d,'  not an Element ranging frame ('+b.length+' B)','er');return;}
+      addRange(d,{m:r.m,deg:r.deg,raw:hexOf(b)});
+    }
+  },
+  aea:{ // V1.7.0, LAB-05. Read-only.
+    name:'AEA BC1500 (rangefinder)',
+    match:(d)=>/^AEA/i.test(d.name||''),
+    need:[DSPS_TX],
+    ui(d,box){buildRangeUI(d,box,'DSPS notify, ASCII lines ending CR LF: "HTZGDDist :113.0m" + "HTZGDAngle:+1", or one "#point#{…}" JSON line. m or y (yards → metres here); angle whole degrees. Open: what switches the format, and whether the distance is line-of-sight or horizontal. Nothing is written to the rangefinder.');},
+    rx(d,uuid,b){
+      if(uuid!==DSPS_TX)return;
+      d.st.aea=d.st.aea||{buf:'',pend:null};const st=d.st.aea;
+      st.buf+=new TextDecoder().decode(new Uint8Array(b));
+      if(st.buf.length>1024){log(d,'  buffer overflow, flushed','er');st.buf='';}
+      const lines=st.buf.split('\n');st.buf=lines.pop();
+      for(const raw of lines){const line=raw.replace(/\r/g,'').trim();if(!line)continue;
+        const r=aeaLine(st,line);if(r)addRange(d,{m:r.m,deg:r.deg,raw:r.raw+' '+r.fmt});}
+    }
+  },
+  labradar:{ // V1.7.0. Writes only the LabRadar app's own start sequence, and only with auto-initialise or the button.
+    name:'LabRadar LX (chrono, GATT)',
+    match:(d)=>d.svcs.has(LR_SVC),
+    need:[LR_EVT],
+    ui(d,box){
+      const t={key:tile('App key'),arm:tile('Radar'),ser:tile('Series'),poll:tile('Status polls')};
+      t.key.v.className='v small';t.arm.v.className='v small';
+      box.appendChild(el('div',{class:'scs'},t.key,t.arm,t.ser,t.poll));
+      buildShotUI(d,box,['V@d m/s','d m','gr']);
+      box.appendChild(el('div',{class:'row',style:'margin-top:8px'},el('button',{class:'gold',style:'flex:1 1 auto',onclick:()=>lrStart(d)},'Send start sequence')));
+      box.appendChild(el('div',{class:'note'},'Each shot arrives as event 0x20 the moment the LabRadar records it: V0, the velocity V@d at its first distance point d, and the projectile mass, as in its CSV export (power factor, series and shot number in the log). The LabRadar extrapolates V at that distance when its track ends short of it, so check the track length in the LabRadar app before truing BC from it.'));
+      d.ui.lr=t;lrTags(d);
+    },
+    async init(d){if($('optInit').checked)await lrStart(d);},
+    rx(d,uuid,b){
+      if(uuid!==LR_EVT)return;
+      for(const fr of lrTake(d.st,b)){
+        if(fr.bad){log(d,'  LabRadar frame with bad CRC dropped','er');continue;}
+        const p=fr.p;
+        if(fr.cmd===0x9a){d.st.lrKey=p[0]===0?'accepted':'REJECTED ('+(p[0]||0)+')';log(d,'  app key '+d.st.lrKey,p[0]===0?'hl':'er');if(p[0]===0)lrStartPoll(d);}
+        else if(fr.cmd===0x86)log(d,'  device info '+hexOf(p),'hl');
+        else if(fr.cmd===0x81){d.st.lrPolls=(d.st.lrPolls||0)+1;}
+        else if(fr.cmd===0x27&&p.length>=2){d.st.lrSeries=(p[0]<<8)|p[1];log(d,'  current series '+d.st.lrSeries,'hl');}
+        else if(fr.cmd===0x25){d.st.lrArmed=p[0]===1;log(d,'  radar '+(d.st.lrArmed?'ARMED':'stopped'),'hl');}
+        else if(fr.cmd===0x20){const s=lrShot(p);if(!s){log(d,'  shot event did not parse ('+p.length+' B)','er');continue;}
+          addShot(d,s.v0,[s.vd>0?s.vd.toFixed(2):'—',s.dist>0?s.dist.toFixed(1):'—',s.massG>0?(s.massG*GR_PER_G).toFixed(2):'—'],'series '+s.series+' · shot '+s.shot+(s.pf>0?' · PF '+s.pf.toFixed(2):'')+' · event 0x20');}
+        else log(d,'  cmd 0x'+fr.cmd.toString(16)+' ['+p.length+' B]');
+        lrTags(d);
+      }
+    },
+    stop(d){lrStopPoll(d);}
+  },
   generic:{
     name:'Generic / unknown',
     match:()=>true,
@@ -527,7 +670,26 @@ const PROFILES={
     ui(d,box){box.appendChild(el('div',{class:'note'},'No decoder. Every subscribed characteristic and advert is logged as hex + ASCII. Use the manual write panel to experiment, Save the log, and send it over for protocol work.'));}
   }
 };
-const MATCH_ORDER=['fxpro','truebal','calypso','generic'];
+const MATCH_ORDER=['fxpro','truebal','calypso','labradar','element','aea','generic'];
+
+/* ---------- V1.7.0 LabRadar helpers (per device) ---------- */
+const GR_PER_G=15.4323584;
+function lrTags(d){const t=d.ui.lr;if(!t)return;t.key.v.textContent=d.st.lrKey||'—';t.arm.v.textContent=d.st.lrArmed==null?'—':d.st.lrArmed?'armed':'stopped';
+  t.ser.v.textContent=d.st.lrSeries!=null?String(d.st.lrSeries):'—';t.poll.v.textContent=d.st.lrPolls||0;}
+async function lrSend(d,cmd,payload){
+  const c=d.chars.get(LR_CMD);if(!c){log(d,'LabRadar command characteristic not available','er');return;}
+  d.st.lrSeq=((d.st.lrSeq||0)+1)&0xffff;const f=lrFrame(cmd,d.st.lrSeq,payload);
+  try{await gattWrite(d,c,f,'wr');log(d,'TX→LR cmd 0x'+cmd.toString(16).padStart(2,'0')+' ['+f.length+' B]','hs');}catch(e){log(d,'LR write failed: '+e.message,'er');}
+}
+async function lrStart(d){
+  const en=d.chars.get(LR_EN);
+  if(en){try{await gattWrite(d,en,new Uint8Array([1]),'wr');log(d,'TX→LR enable 01','hs');}catch(e){log(d,'LR enable write failed: '+e.message,'er');}}
+  d.st.lrKey='sent…';lrTags(d);
+  await lrSend(d,0x06);await sleep(150);
+  await lrSend(d,0x1a,LR_KEY);
+}
+function lrStartPoll(d){if(d.st.lrPoll)return;d.st.lrPoll=setInterval(()=>{if(d.connected)lrSend(d,0x01);},10000);lrSend(d,0x01);}
+function lrStopPoll(d){if(d.st.lrPoll){clearInterval(d.st.lrPoll);d.st.lrPoll=null;}}
 
 /* ---------- Calypso helpers (per device) ---------- */
 function calBump(d,k){d.st[k]=(d.st[k]||0)+1;if(d.ui.cal)d.ui.cal.t[k].v.textContent=d.st[k];}
@@ -737,7 +899,7 @@ function setDot(d,cls,txt){d.ui.dot.className='dot '+cls;d.ui.status.textContent
 function setProfile(d,key,auto){
   if(PROFILES[d.profile].stop&&d.profile!==key)PROFILES[d.profile].stop(d);
   d.profile=key;d.ui.profSel.value=key;d.ui.profTag.textContent=PROFILES[key].name;
-  d.ui.body.textContent='';d.ui.cal=null;d.ui.shot=null;d.ui.fxb=null;
+  d.ui.body.textContent='';d.ui.cal=null;d.ui.shot=null;d.ui.fxb=null;d.ui.rng=null;d.ui.lr=null;
   PROFILES[key].ui(d,d.ui.body);
   log(d,'Profile: '+PROFILES[key].name+(auto?' (auto)':' (manual)'),'hl');
 }

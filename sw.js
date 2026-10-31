@@ -3,7 +3,7 @@
    Everything else in CORE: cache-first.
    Separate cache name from the calculator (sen-ballistics-*), so the two apps never touch each other's caches.
    RELEASE: bump CACHE together with every index.html change. */
-const CACHE = 'sen-ble-probe-v1.6.1';
+const CACHE = 'sen-ble-probe-v1.7.0';
 const CORE = ['./', './index.html', './manifest.json', './probe-icon-192.png', './probe-icon-512.png'];
 
 self.addEventListener('install', e => {

@@ -2,6 +2,20 @@
 
 `index.html` is always the current probe; each version is kept alongside it for rollback.
 
+## V1.7.0 — 2026-10-31
+- **Device profiles from the owner's captures.** Each device's card now shows decoded values instead of raw hex.
+  - **Element Titan 3K / Helix 1.5K (LAB-04).** Matched by name, or by the Nordic UART service. Each `F5` frame becomes one ranging: distance in metres (0.1 m, always metres over Bluetooth) plus whole degrees. Each ranging also shows in yards. Reproduces the five confirmed rangings, 25.0 / 5.9 / 42.9 / 39.8 / 1134.5 m at −1 / −13 / +31 / +5 / +5°. Keep the unit in LOS: it sends the distance of the mode on its display and no flag says which.
+  - **AEA BC1500 (LAB-05).** Matched by name (`AEA…`). Accepts both formats seen, the `HTZGDDist` / `HTZGDAngle` text lines and the `#point#{…}` JSON line, buffered to CR LF across notifications. Yards are converted to metres. A distance whose angle never arrives is kept without an angle. Broken JSON is ignored. Still open: what switches the format, and whether the distance is line-of-sight or horizontal.
+  - **LabRadar LX.** Matched by its own service (`da2b84f1…`).
+    - Sends the LabRadar app's own start sequence: enable byte, cmd 06, cmd 1A with the fixed 64-byte app key, then a status poll every 10 s. The key was byte-identical in two sessions a day apart.
+    - Card tiles: App key accepted / REJECTED, Radar armed / stopped, Series, Status polls.
+    - Live shots from event 0x20: V0, V at the first distance point and projectile mass in the shot table; series, shot number and power factor in the log. Values match the LabRadar CSV export.
+    - Frames are reassembled across notifications and CRC-checked. The CRC is the reflected CCITT polynomial, init 0xBEEF, final XOR 0xFFFF. It was found from the snoops and holds on all 341 captured frames. Frames with a bad CRC are dropped.
+    - Note on the card: the LabRadar extrapolates V at the distance point when its track ends short of it, so check the track length before truing BC.
+- **Writes.** Element and AEA are read-only: nothing is ever written. The LabRadar is written to only with "Auto-initialise known profiles" ticked or with its **Send start sequence** button, and only commands 06 / 1A / 01.
+- DSPS and the LabRadar service are now built into the chooser, so both connect with the wide service net off.
+- **Tests:** new `tests/profiletest.js` (30 checks), with simulated devices replaying the real captures. The simulated LabRadar checks the CRC of every frame the Lab sends, using a CRC written independently in the test, and accepts only the real key. The frame builder reproduces the app's real frames byte for byte. `rftest.js`: the simulated ASCII rangefinder was renamed from "BC1500" to "ASCII-RF", because the new AEA profile name in every card's profile list made the old name match the wrong card. probetest ALL PASS, capturetest 20/20, unlocktest ALL PASS, lanetest 23/23, rftest 21/21, foldtest 25/25, matchtest 11/11, maindatatest 13/13. Real Chromium at 412 and 780 px with LabRadar and AEA cards filled: no sideways scroll, shot tables fit, no errors.
+
 ## V1.6.1 — 2026-10-31
 - **Fix: the Calypso profile could write to other devices.** It was picked by name (`WDOT-…`) *or* by shape (FFF1 + FFF2). FFF1/FFF2 on the ISSC service is a stock module layout, and the Vector Paragon 7x25 Gen III rangefinder (SCRF-S24) has it too. With "Auto-initialise known profiles" ticked, the Lab sent the full Calypso handshake to the Vector.
   - The Calypso is now picked **by name only**. Every other device gets the generic profile, which is read-only.

@@ -1,0 +1,1459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0a0c0f">
+<title>SEN BLE Probe V1.7.0</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="probe-icon-192.png">
+<link rel="apple-touch-icon" href="probe-icon-192.png">
+<style>
+:root{--bg:#0a0c0f;--bg2:#11141a;--bg3:#171b22;--border:rgba(255,255,255,.1);--text:#f4f3ef;--text2:#bdbab1;--text3:#6f6d67;--accent:#7eb8c4;--gold:#c8a96e;--green:#7ab87a;--warn:#e07a5f;--red:#d4574e;--violet:#d9b3ff;--pink:#ff9ed8;--mono:'IBM Plex Mono','SF Mono',Menlo,Consolas,monospace}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--mono);font-size:13px;line-height:1.5;max-width:820px;margin:0 auto;padding:14px 14px calc(84px + env(safe-area-inset-bottom))}
+h1{font-size:17px;font-weight:700}
+.sub{font-size:10px;color:var(--text3);margin:2px 0 14px}
+.panel{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:12px}
+.panel.dev{border-left:4px solid var(--c,var(--accent))}
+.panel h2{font-size:10px;color:var(--text3);letter-spacing:.12em;text-transform:uppercase;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.sp{flex:1}
+button{font-family:var(--mono);cursor:pointer;font-size:12px;padding:10px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:7px;color:var(--text);min-height:42px}
+button.primary{background:var(--accent);color:#0a0c0f;border-color:var(--accent);font-weight:600}
+button.gold{background:var(--gold);color:#0a0c0f;border-color:var(--gold);font-weight:600}
+button.warn{color:var(--warn);border-color:rgba(224,122,95,.4)}
+button.sm{min-height:auto;padding:5px 9px;font-size:10px}
+button:disabled{opacity:.4;pointer-events:none}
+input,select{font-family:var(--mono);font-size:13px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:9px;width:100%;min-height:40px}
+input.lblin{width:90px;min-height:auto;padding:4px 6px;font-size:12px;font-weight:700;color:var(--c,var(--accent))}
+label.ck{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--text2);cursor:pointer;margin-top:6px}
+label.ck input{width:auto;min-height:auto;flex:0 0 auto}
+.lbl{font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin:8px 0 4px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.row>*{flex:1 1 120px}
+.row>button{flex:0 0 auto}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--text3);display:inline-block;flex:0 0 auto}
+.dot.on{background:var(--green)}.dot.scan{background:var(--gold);animation:p 1s infinite}.dot.err{background:var(--red)}
+@keyframes p{50%{opacity:.4}}
+.scs{display:grid;grid-template-columns:repeat(auto-fit,minmax(88px,1fr));gap:8px;margin-top:8px}
+.sc{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:8px}
+.sc .l{font-size:8px;color:var(--text3);text-transform:uppercase}
+.sc .v{font-size:17px;font-weight:700;color:var(--accent);word-break:break-all}
+.sc .v.small{font-size:11px}
+.sc .u{font-size:8px;color:var(--text2)}
+.ok{color:var(--green)!important}.bad{color:var(--warn)!important}
+.log{background:#06080b;border:1px solid var(--border);border-radius:8px;padding:10px;height:400px;overflow-y:auto;font-size:11px;line-height:1.6;white-space:pre-wrap;word-break:break-all}
+.log .rx{color:var(--green)}.log .tx{color:var(--gold)}.log .sys{color:var(--text3)}.log .er{color:var(--red)}.log .hl{color:var(--accent);font-weight:600}.log .wu{color:var(--gold);font-weight:600}.log .hs{color:var(--violet);font-weight:600}.log .other{color:var(--pink)}.log .shot{color:#fff;font-weight:700}
+.note{font-size:10px;color:var(--text3);line-height:1.7;margin-top:8px}
+.tag{display:inline-block;padding:2px 7px;border-radius:4px;font-size:9px;letter-spacing:0;text-transform:none}
+.tag.live{background:rgba(122,184,122,.15);color:var(--green)}
+.tag.stale{background:rgba(224,122,95,.15);color:var(--warn)}
+.tag.idle{background:rgba(200,169,110,.15);color:var(--gold)}
+.tag.prof{background:rgba(126,184,196,.12);color:var(--accent)}
+details{margin-top:10px}
+summary{font-size:10px;color:var(--text2);cursor:pointer;text-transform:uppercase;letter-spacing:.08em}
+.disco{font-size:10px;color:var(--text2);line-height:1.7;margin-top:6px}
+.disco .svc{color:var(--violet);font-weight:600;margin-top:6px}
+.disco .chr{padding-left:12px}
+.steps{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.steps button{font-size:10px;padding:7px 9px;min-height:auto}
+.steps button.done{border-color:var(--violet);color:var(--violet)}
+.steps button.reply{border-color:var(--green);color:var(--green)}
+.steps button.silent{border-color:var(--warn);color:var(--warn)}
+table.shots{width:100%;border-collapse:collapse;font-size:11px;margin-top:8px}
+table.shots th{font-size:8px;color:var(--text3);text-transform:uppercase;text-align:right;padding:3px 6px;border-bottom:1px solid var(--border)}
+table.shots td{text-align:right;padding:3px 6px;border-bottom:1px solid rgba(255,255,255,.04);color:var(--text2)}
+table.shots td:first-child,table.shots th:first-child{text-align:left}
+.shotwrap{max-height:220px;overflow-y:auto}
+.caps{font-size:10px;color:var(--text2);line-height:1.8}
+/* V1.3.0 tabs + status strip + capture */
+.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:40;display:flex;gap:4px;padding:6px 8px calc(6px + env(safe-area-inset-bottom));background:rgba(10,12,15,.97);border-top:1px solid var(--border)}
+.tabbar button{flex:1 1 0;min-height:48px;font-size:11px;background:transparent;border-color:transparent}
+.tabbar button.on{background:var(--bg3);border-color:var(--accent);color:var(--accent);font-weight:600}
+/* V1.6.0 fold-aware second pane (same rules as Main CORE-18) */
+#lab-pane{display:none}
+html.fold body{max-width:none;margin:0;padding-right:calc(min(50vw,560px) + 18px)}
+html.fold #lab-pane{display:block;position:fixed;top:0;right:0;bottom:calc(58px + env(safe-area-inset-bottom));width:min(50vw,560px);overflow-y:auto;padding:12px 14px;background:var(--bg);border-left:1px solid var(--border);z-index:30}
+html.fold #lab-pane .log{height:calc(100vh - 230px)}
+html.fold.pane-cap #lab-pane .log{height:260px}
+html.fold.pane-none body{max-width:900px;margin:0 auto;padding-right:14px}
+html.fold.pane-none #lab-pane{display:none}
+.pane-sw{display:flex;gap:6px;margin-bottom:8px}.pane-sw:empty{display:none}
+.pane-sw button.on{border-color:var(--accent,#7eb8c4);color:var(--accent,#7eb8c4)}
+#pane-show{position:fixed;right:14px;bottom:calc(70px + env(safe-area-inset-bottom));z-index:41}
+.strip{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:-6px 0 12px;min-height:28px}
+.chip{min-height:30px;padding:4px 10px;font-size:11px;display:inline-flex;align-items:center;gap:6px;border-color:var(--c,var(--border))}
+#capmarks button{font-size:11px;padding:9px 11px}
+table.capsum{width:100%;border-collapse:collapse;font-size:10px;margin-top:8px}
+table.capsum th{font-size:8px;color:var(--text3);text-transform:uppercase;text-align:left;padding:3px 5px;border-bottom:1px solid var(--border)}
+table.capsum td{padding:4px 5px;border-bottom:1px solid rgba(255,255,255,.04);color:var(--text2);vertical-align:top}
+table.capsum td.hexcell{word-break:break-all;color:var(--text)}
+table.capsum td.chg{color:var(--gold);font-weight:600}
+.capwrap{max-height:340px;overflow:auto}
+tr.hit td{color:var(--green,#7ab87a);font-weight:600}
+/* V1.4.0 wind lane */
+#lanewrap{width:100%;margin-top:10px}
+#lanecv{display:block;width:100%;border-radius:8px;touch-action:pan-y}
+input[type=range]{min-height:32px;padding:0}
+pre.dump{font-size:10px;white-space:pre-wrap;word-break:break-all;color:var(--text2);margin-top:8px}
+</style>
+</head>
+<body>
+<h1>SEN · BLE Probe <span style="font-size:11px;color:var(--text3)">V1.7.0</span></h1>
+<div class="sub">Multi-device BLE diagnostic for the SEN platform. Device profiles: Calypso Mini (wind), FX Pocket Pro (chrono, GATT), FX True Ballistic (radar, GATT), FX Pocket V2/D1 (chrono, broadcast), LabRadar LX (chrono), Element Titan / Helix and AEA BC1500 (rangefinders), Generic (anything else). Chrome on Android or desktop, HTTPS only.</div>
+<div class="strip" id="strip" aria-label="Devices"></div>
+
+<section id="tab-devices">
+
+<!-- SETUP -->
+<div class="panel">
+  <h2>Add device</h2>
+  <div class="row">
+    <button class="primary" id="addbtn" style="flex:1 1 auto">+ Add device</button>
+    <button id="knownbtn" style="flex:1 1 auto">Reconnect known devices</button>
+  </div>
+  <label class="ck"><input type="checkbox" id="optGatt" checked> Connect GATT (untick for broadcast-only devices: adverts are watched instead)</label>
+  <label class="ck"><input type="checkbox" id="optInit" checked> Auto-initialise known profiles (Calypso handshake + keepalive, LabRadar start sequence + status poll)</label>
+  <label class="ck"><input type="checkbox" id="optSubAll" checked> Subscribe to every notify/indicate characteristic</label>
+  <label class="ck"><input type="checkbox" id="optRead" checked> Read every readable characteristic once</label>
+  <label class="ck"><input type="checkbox" id="optAds"> Also watch advertisements after connecting</label>
+  <label class="ck"><input type="checkbox" id="optWide" checked> Wide service net for unknown devices (rangefinders…): every 16-bit service in 1800–18FF, FE00–FEFF, FF00–FFFF plus common BLE-serial module services</label>
+  <div class="lbl">Extra service UUIDs (comma-separated, 16-bit hex or 128-bit)</div>
+  <input id="extraSvc" placeholder="from nRF Connect, e.g. fff0, 0000ffe0-0000-1000-8000-00805f9b34fb" onchange="extraSave()">
+  <div class="lbl">Extra manufacturer company IDs for adverts (hex)</div>
+  <input id="extraMfr" placeholder="e.g. 004c, 0499">
+  <div class="note">Web Bluetooth only exposes services listed before connecting. Built in: ISSC UART (Calypso), FX VRS (Pocket Pro), FX True Ballistic, Garmin (Xero), LabRadar LX, DSPS (AEA), Nordic UART (Element), FFF0/FFE0/FFE5/FFB0/FFD0, battery, device info, ESS, DFU. For an unknown device, read its service UUIDs in nRF Connect and paste them above before adding it.</div>
+  <details open><summary>Browser capabilities</summary><div class="caps" id="caps"></div></details>
+</div>
+
+<div id="devices"></div>
+</section>
+
+<section id="tab-data" hidden>
+<!-- MAIN APP DATA (CORE-09) -->
+<div class="panel" id="mainpanel">
+  <h2>Main app data <span class="sp"></span><button class="sm" id="mainbtn">Refresh</button></h2>
+  <div class="small" id="mainstatus">Reading…</div>
+  <div class="scs" id="mainsession"></div>
+  <div class="note">Read-only view of the SEN calculator's profiles on this phone (same sprukk.github.io origin). The probe never writes to the calculator's storage and never creates it. Re-read whenever you come back to this app.</div>
+</div>
+
+</section>
+
+<section id="tab-capture" hidden>
+<div class="panel">
+  <h2>Capture session <span class="sp"></span><span id="capstat" style="text-transform:none;letter-spacing:0"></span></h2>
+  <div class="note" style="margin-top:0">For working out unknown data: records every notification, advert and read from the ticked devices, plus your markers for what you're physically doing. The table shows which bytes changed since the last marker. Never writes to a device.</div>
+  <div class="lbl">Devices</div>
+  <div id="capdevs"></div>
+  <div class="row" style="margin-top:8px">
+    <div><div class="lbl">Test</div><select id="cappreset"></select></div>
+    <div><div class="lbl">Session name</div><input id="capname" placeholder="e.g. FX angle test 1"></div>
+  </div>
+  <label class="ck"><input type="checkbox" id="cappoll"> Re-read every readable characteristic every 2 s (finds slow-changing values like temperature)</label>
+  <div class="row" style="margin-top:10px"><button class="primary" id="capstart" style="flex:1 1 auto">Start capture</button></div>
+  <div class="lbl">Markers — tap when the rifle / device is in that state</div>
+  <div class="steps" id="capmarks"></div>
+  <div class="row" style="margin-top:8px"><input id="capmarktxt" placeholder="Own marker, e.g. Rifle on bipod" maxlength="60"><button id="capmarkbtn">Mark</button></div>
+  <div class="lbl">Rangefinder: right after each ranging, type what the display shows and tap Mark range</div>
+  <div class="row"><input id="caprng" type="number" step="0.1" placeholder="Distance shown" style="flex:1 1 90px"><select id="caprngu" style="flex:0 0 auto"><option value="m">m</option><option value="yd">yd</option></select><input id="capang" type="number" step="0.1" placeholder="Angle ° (if shown)" style="flex:1 1 90px"><button id="caprngbtn">Mark range</button></div>
+  <div id="capfind"></div>
+  <div class="row" style="margin-top:10px">
+    <button class="sm" id="capreadbtn">Read all now</button><button class="sm" id="capdumpbtn">GATT dump</button>
+    <span class="sp"></span><button class="sm" id="capsavebtn">Save .json</button><button class="sm" id="captxtbtn">Save .txt</button>
+  </div>
+  <div class="capwrap" id="capsumwrap"><table class="capsum"><thead><tr><th>Device · characteristic</th><th>#</th><th>Last value (hex)</th><th>Since last marker</th></tr></thead><tbody id="capsum"></tbody></table></div>
+  <pre class="dump" id="capdump"></pre>
+</div>
+</section>
+
+<section id="tab-lane" hidden>
+<div class="panel">
+  <h2>Wind lane <span class="sp"></span><span class="tag idle">illustrative · not dope</span></h2>
+  <div class="row">
+    <div><div class="lbl">Lane length m</div><input type="number" id="lnLen" min="10" max="1000" step="5"></div>
+    <div><div class="lbl">Between stations</div><select id="lnMode"><option value="nearest">Nearest station</option><option value="blend">Blend (linear)</option></select></div>
+  </div>
+  <div class="row">
+    <div><div class="lbl">MV m/s</div><input type="number" id="lnMv" min="50" max="400" step="1"></div>
+    <div><div class="lbl">BC G7 lb/in²</div><input type="number" id="lnBc" min="0.02" max="0.5" step="0.001"></div>
+  </div>
+  <div id="lanewrap"><canvas id="lanecv" aria-label="Top-down shooting lane with wind stations and bullet path"></canvas></div>
+  <div class="scs">
+    <div class="sc"><div class="l">Drift at target</div><div class="v" id="lnDrift">—</div><div class="u">mm</div></div>
+    <div class="sc"><div class="l">Drift</div><div class="v" id="lnMoa">—</div><div class="u">MOA</div></div>
+    <div class="sc"><div class="l">Drift</div><div class="v" id="lnMrad">—</div><div class="u">mrad</div></div>
+    <div class="sc"><div class="l">Time of flight</div><div class="v" id="lnTof">—</div><div class="u">ms</div></div>
+    <div class="sc"><div class="l" id="lnSn0">S1 share</div><div class="v" id="lnS0">—</div><div class="u">mm, others calm</div></div>
+    <div class="sc"><div class="l" id="lnSn1">S2 share</div><div class="v" id="lnS1">—</div><div class="u">mm, others calm</div></div>
+  </div>
+  <div class="note" id="lnState"></div>
+  <div class="note">Top view: firing point at the bottom, target at the top, distances to scale, sideways drift exaggerated (factor shown on the picture). The gold line is the bullet's sideways path; each station's wind applies to its shaded part of the lane (<b>Nearest</b>) or fades into the next station's (<b>Blend</b>). Station wind = direction it comes FROM, clockwise from the mark, mark pointed at the target (0° head, 90° from the right), as the Calypso reports and the calculator uses. Live Calypsos feed their rolling average. Physics: the calculator's G7 drag (V1.24.2) on the bullet's speed relative to the local wind, Ljubljana default air. <b>Illustrative only:</b> the multi-station model is not verified (CORE-17), there's no scope, zero or gravity here — don't dial from it.</div>
+</div>
+<div id="lanest"></div>
+</section>
+
+<section id="tab-log" hidden>
+<!-- LOG -->
+<div class="panel" id="log-panel">
+  <h2>Timeline log <span class="sp"></span>
+    <button class="sm" id="pausebtn">Pause</button>
+    <button class="sm" id="copybtn">Copy</button>
+    <button class="sm" id="savebtn">Save .txt</button>
+    <button class="sm" id="clearbtn">Clear</button>
+  </h2>
+  <div class="row">
+    <div><div class="lbl">Show</div><select id="logFilter"><option value="all">All devices</option><option value="0">System only</option></select></div>
+  </div>
+  <label class="ck"><input type="checkbox" id="hideIdle" checked> Collapse repeated Calypso HDLC idle frames and unchanged adverts</label>
+  <div class="log" id="log" style="margin-top:8px"></div>
+  <div class="note"><span style="color:var(--green)">green</span> RX · <span style="color:var(--gold)">gold</span> TX / :WU wind · <span style="color:var(--violet)">violet</span> handshake · <span style="color:var(--pink)">pink</span> adverts / unhandled characteristics · <span style="color:var(--accent)">blue</span> decoded · <b style="color:#fff">white</b> shots. Save/Copy always exports every device, whatever the filter.</div>
+</div>
+
+</section>
+
+<aside id="lab-pane" aria-label="Second pane"><div class="pane-sw" id="pane-sw"></div><div class="strip" id="strip-pane" aria-label="Devices"></div></aside>
+<button class="sm" id="pane-show" style="display:none" onclick="setPaneMode(curTab(),'log')">◧ Log</button>
+<nav class="tabbar" aria-label="Probe sections">
+  <button id="tb-devices" class="on">Devices</button><button id="tb-capture">Capture</button><button id="tb-lane">Lane</button><button id="tb-log">Log</button><button id="tb-data">Data</button>
+</nav>
+
+<script>
+'use strict';
+const VERSION='1.7.0';
+const ISSC='49535343-fe7d-4ae5-8fa9-9fafd205e455';
+const NUS='6e400001-b5a3-f393-e0a9-e50e24dcca9e';
+const VRS='5445883a-3cab-42e5-b625-ca4e243f5a2c', VRS_VEL='5445883a-3cab-42e5-b625-ca4e243f5a2d', VRS_CMD='5445883a-3cab-42e5-b625-ca4e243f5a2e';
+const TB='00001623-88ec-688c-644b-3fa706c0bb76', TB_SHOT='00001624-88ec-688c-644b-3fa706c0bb76', TB_BATT='00001627-88ec-688c-644b-3fa706c0bb76', TB_3P='0000162b-88ec-688c-644b-3fa706c0bb76', TB_STREAM='00001626-88ec-688c-644b-3fa706c0bb76';
+const FFF1='0000fff1-0000-1000-8000-00805f9b34fb', FFF2='0000fff2-0000-1000-8000-00805f9b34fb', BATT='00002a19-0000-1000-8000-00805f9b34fb';
+/* V1.6.1: Garmin multi-link service (Xero C1 and other Garmin devices, 2026-10-30 snoop). Named only so the
+   chooser exposes it; nothing is written to it. */
+const GARMIN='6a4e2800-667b-11e3-949a-0800200c9a66';
+/* V1.7.0 device profiles (owner captures 2026-10-30/31). Element Titan 3K / Helix 1.5K: Nordic UART, notify 6e400003.
+   AEA BC1500: Dialog DSPS, notify …5cb8. LabRadar LX: own service; commands on bf03260c, responses + events on
+   18cda784, a87988b9 enable byte. */
+const NUS_TX='6e400003-b5a3-f393-e0a9-e50e24dcca9e';
+const DSPS='0783b03e-8535-b5a0-7140-a304d2495cb7', DSPS_TX='0783b03e-8535-b5a0-7140-a304d2495cb8';
+const LR_SVC='da2b84f1-6279-48de-bdc0-afbea0226079', LR_CMD='bf03260c-7205-4c25-af43-93b1c299d159',
+  LR_EVT='18cda784-4bd3-4370-85bb-bfed91ec86af', LR_EN='a87988b9-694c-479c-900e-95dfa6c00a24';
+const BASE_SVCS=[ISSC,NUS,VRS,TB,GARMIN,DSPS,LR_SVC,0xFFF0,0xFFE0,0xFFE5,0xFFB0,0xFFD0,0xFEE7,0xFE59,0x180F,0x180A,0x1800,0x1801,0x181A,0x1530];
+const BASE_MFR=[0x0059];
+/* V1.5.0 (LAB-04/05 prep): Web Bluetooth shows only services named before connecting, and a rangefinder's
+   protocol service is unknown. The wide net names every 16-bit UUID in the standard (1800–18FF), member
+   (FE00–FEFF) and vendor (FF00–FFFF) ranges, plus the 128-bit services of common BLE-serial modules. Blocklisted
+   UUIDs in optionalServices are dropped silently by the browser (Web Bluetooth spec; WPT
+   blocklisted-service-in-optionalServices). A 128-bit service outside this list still needs nRF Connect once. */
+const SERIAL_SVCS=['0783b03e-8535-b5a0-7140-a304d2495cb7',   // Dialog DSPS
+  '2456e1b9-26e2-8f83-e744-f34f01e9d701',                      // u-blox serial
+  '569a1101-b87f-490c-92cb-11ba5ea5167c',                      // Laird virtual serial port
+  '00035b03-58e6-07dd-021a-08123a000300',                      // Microchip MLDP (RN4020)
+  '331a36f5-2459-45ea-9d95-6142f0c4b307',                      // Silicon Labs BGX
+  '00010203-0405-0607-0809-0a0b0c0d1910',                      // Telink
+  '00001523-1212-efde-1523-785feabcd123'];                     // Nordic LED-button / template
+const WIDE_SVCS=(()=>{const a=[];for(const [lo,hi] of [[0x1800,0x18ff],[0xfe00,0xfeff],[0xff00,0xffff]])for(let u=lo;u<=hi;u++)a.push(u);return a.concat(SERIAL_SVCS);})();
+function extraSave(){try{localStorage.setItem('sen_lab_extrasvc',$('extraSvc').value);}catch(e){}}
+const FX_BCAST_UUID={'5765fdce':'V2','5765fdcd':'D1'};
+/* :DU unlock token per unit, captured from Anemotracker (HCI snoop 2026-10-26). Fixed per device, not a clock:
+   until its own token is :AK'd the unit answers :NA to :CC and never streams :WU. New unit = one snoop capture. */
+const CAL_UNLOCK={'WDOT-B1F9A6':':DU,1668647648,A7','WDOT-E2896A':':DU,1802347072,AF'};
+const HANDSHAKE=[':GK',':PS,1,1,9F',':WU,5',':WU,6',':VR']; // sent after the :DU unlock
+const KEEPALIVE=':CC,6,86';
+const COLORS=['#7eb8c4','#c8a96e','#d9b3ff','#7ab87a','#ff9ed8','#e07a5f','#9fb4ff','#e6d36b'];
+const NAMES={[NUS_TX]:'NUS TX',[DSPS_TX]:'DSPS TX',[LR_CMD]:'LR cmd',[LR_EVT]:'LR evt',[LR_EN]:'LR enable',[FFF1]:'FFF1 cmd',[FFF2]:'FFF2 data',[BATT]:'2A19 batt',[VRS_VEL]:'VRS velocity',[VRS_CMD]:'VRS cmd',[TB_SHOT]:'TB shot',[TB_BATT]:'TB batt',[TB_3P]:'TB 3rd-party',[TB_STREAM]:'TB stream','00001625-88ec-688c-644b-3fa706c0bb76':'TB cmd'};
+const FPS=0.3048;
+const $=id=>document.getElementById(id);
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+
+/* ---------- tiny DOM helper (no innerHTML anywhere) ---------- */
+function el(tag,props,...kids){
+  const e=document.createElement(tag);
+  if(props)for(const k in props){
+    if(k==='class')e.className=props[k];
+    else if(k==='style')e.style.cssText=props[k];
+    else if(k.startsWith('on'))e.addEventListener(k.slice(2),props[k]);
+    else if(k in e)e[k]=props[k];
+    else e.setAttribute(k,props[k]);
+  }
+  for(const k of kids){if(k==null)continue;e.appendChild(typeof k==='string'?document.createTextNode(k):k);}
+  return e;
+}
+function tile(label,unit){const v=el('div',{class:'v'},'—');const t=el('div',{class:'sc'},el('div',{class:'l'},label),v,unit?el('div',{class:'u'},unit):null);t.v=v;return t;}
+
+/* ---------- formatting ---------- */
+function hexOf(b){return Array.from(b).map(x=>x.toString(16).padStart(2,'0')).join(' ');}
+function ascOf(b){return Array.from(b).map(x=>x>=0x20&&x<0x7f?String.fromCharCode(x):(x===13?'⏎':'.')).join('');}
+function shortU(u){u=String(u).toLowerCase();if(NAMES[u])return NAMES[u];const m=/^0000([0-9a-f]{4})-0000-1000-8000-00805f9b34fb$/.exec(u);return m?m[1]:u.slice(0,8)+'…'+u.slice(-4);}
+function ts(){const d=new Date();return d.toLocaleTimeString('en-GB',{hour12:false})+'.'+String(d.getMilliseconds()).padStart(3,'0');}
+
+/* ---------- log ---------- */
+const LOG=[];let paused=false;
+function log(d,msg,cls){
+  const e={t:ts(),n:d?d.n:0,label:d?d.label:'SYS',cls:cls||'sys',msg};
+  LOG.push(e);if(LOG.length>20000)LOG.splice(0,LOG.length-20000);
+  if(!paused&&passes(e))appendLine(e,true);
+}
+function passes(e){const f=$('logFilter').value;return f==='all'||String(e.n)===f;}
+function lineText(e){return '['+e.label+' '+e.t+'] '+e.msg;}
+function appendLine(e,scroll){
+  const box=$('log'),s=el('span',{class:e.cls},lineText(e)+'\n');
+  const dev=DEVICES.find(x=>x.n===e.n);if(dev&&e.cls!=='er')s.style.borderLeft='3px solid '+dev.color,s.style.paddingLeft='5px';
+  box.appendChild(s);while(box.childNodes.length>1500)box.removeChild(box.firstChild);
+  if(scroll)box.scrollTop=box.scrollHeight;
+}
+function rerenderLog(){const box=$('log');box.textContent='';LOG.filter(passes).slice(-1500).forEach(e=>appendLine(e,false));box.scrollTop=box.scrollHeight;}
+function exportText(){
+  const head=['SEN BLE Probe V'+VERSION+' · '+new Date().toISOString(),navigator.userAgent,'Capabilities: '+CAPS.join(' · '),'Devices:'];
+  DEVICES.forEach(d=>head.push('  '+d.label+' = "'+d.name+'" profile='+d.profile+' id='+d.dev.id));
+  return head.join('\n')+'\n\n'+LOG.map(lineText).join('\n');
+}
+
+/* ---------- shot statistics (shared by chrono profiles) ---------- */
+function stats(arr){
+  const n=arr.length;if(!n)return null;
+  const mean=arr.reduce((a,b)=>a+b,0)/n;
+  const es=Math.max(...arr)-Math.min(...arr);
+  const sd=n>1?Math.sqrt(arr.reduce((a,b)=>a+(b-mean)*(b-mean),0)/(n-1)):NaN;
+  return {n,mean,es,sd};
+}
+/* ---------- CORE-09: read-only access to the Main app's data ----------
+   Storage contract (both repos): Main owns IndexedDB 'sen_main' (store 'kv', key 'db', value = the
+   JSON snapshot), localStorage 'sen_platform_v1', caches 'sen-ballistics-*'. The Lab owns 'sen_lab',
+   'sen_lab_*', 'sen-ble-probe-*'. This reader opens Main's database WITHOUT a version and aborts the
+   upgrade if it doesn't exist yet — so it never creates an empty 'sen_main' (that would break Main's
+   first launch) — uses read-only transactions only, closes the connection at once (never blocks a
+   Main upgrade), falls back to Main's localStorage copy, and refuses snapshots whose schema is newer
+   than this reader knows. */
+const MAIN_STORE={idb:'sen_main',store:'kv',key:'db',ls:'sen_platform_v1'};
+const MAIN_SCHEMA={rifles:1,projectiles:1,weathers:1,scopes:1,reticles:1,dopeCards:2};
+const SenMainData={
+  readIdb(){return new Promise(res=>{
+    if(!window.indexedDB)return res(null);
+    let r;try{r=indexedDB.open(MAIN_STORE.idb);}catch(e){return res(null);}
+    r.onupgradeneeded=e=>{e.target.transaction.abort();};      // didn't exist: create nothing
+    r.onerror=e=>{e.preventDefault();res(null);};
+    r.onblocked=()=>res(null);
+    r.onsuccess=()=>{const db=r.result;
+      if(!db.objectStoreNames.contains(MAIN_STORE.store)){db.close();return res(null);}
+      const q=db.transaction(MAIN_STORE.store,'readonly').objectStore(MAIN_STORE.store).get(MAIN_STORE.key);
+      q.onsuccess=()=>{db.close();res(q.result==null?null:q.result);};
+      q.onerror=()=>{db.close();res(null);};};
+  });},
+  async read(){
+    let raw=await this.readIdb(),src='IndexedDB';
+    if(raw==null){try{raw=localStorage.getItem(MAIN_STORE.ls);}catch(e){raw=null;}src='localStorage';}
+    if(raw==null)return{src:null,data:null,err:null};
+    let d;try{d=JSON.parse(raw);}catch(e){return{src,data:null,err:'unreadable ('+e.message+')'};}
+    const newer=Object.keys(d&&d.schema||{}).filter(k=>(d.schema[k]||0)>(MAIN_SCHEMA[k]||0));
+    if(newer.length)return{src,data:null,err:'newer than this probe understands ('+newer.map(k=>k+' v'+d.schema[k]).join(', ')+') — update the Lab app'};
+    return{src,data:d,err:null};
+  }
+};
+let MAIN=null;
+function mainSession(){
+  const d=MAIN&&MAIN.data;if(!d||!d.session)return{};
+  const s=d.session,find=(k,id)=>(d[k]||[]).find(x=>x.id===id)||null;
+  const proj=find('projectiles',s.projId),drag=s.drag||'g7';
+  return{rifle:find('rifles',s.rifleId),proj,wx:find('weathers',s.curWxId),drag,bc:proj?(drag==='g1'?proj.bcg1:proj.bcg7):null};
+}
+async function loadMain(){
+  MAIN=await SenMainData.read();
+  const st=$('mainstatus'),box=$('mainsession');if(!st)return;
+  box.textContent='';
+  if(MAIN.err)st.textContent='⚠ Main app data '+MAIN.err+'.';
+  else if(!MAIN.data)st.textContent='No SEN calculator data on this phone yet — open the calculator once.';
+  else{const d=MAIN.data,n=k=>(d[k]||[]).length;
+    st.textContent='Found in '+MAIN.src+' · '+n('rifles')+' rifles · '+n('projectiles')+' projectiles · '+n('scopes')+' scopes · '+n('weathers')+' weathers · '+n('dopeCards')+' dope cards';
+    const m=mainSession(),t=(l,v,u)=>{const x=tile(l,u);x.v.textContent=v;x.v.classList.add('small');return x;};
+    box.append(t('Rifle',m.rifle?m.rifle.name:'—'),t('Profile MV',m.rifle&&m.rifle.mv>0?m.rifle.mv.toFixed(1):'—','m/s'),
+      t('Projectile',m.proj?m.proj.name:'—'),t('BC '+m.drag.toUpperCase(),m.bc>0?m.bc.toFixed(4):'pending','lb/in²'),t('Weather',m.wx?m.wx.name:'—'));}
+  DEVICES.forEach(renderShots);
+}
+function mvCompareText(s){
+  const m=mainSession();
+  if(!s||!m.rifle||!(m.rifle.mv>0))return'';
+  const dv=s.mean-m.rifle.mv;
+  return 'vs Main profile MV ('+m.rifle.name+'): '+m.rifle.mv.toFixed(1)+' m/s → average '+(dv>=0?'+':'−')+Math.abs(dv).toFixed(2)+' m/s ('+(dv>=0?'+':'−')+Math.abs(dv/m.rifle.mv*100).toFixed(1)+' %)';
+}
+function buildShotUI(d,box,extraCols){
+  const t={n:tile('Shots'),last:tile('Last','m/s'),avg:tile('Average','m/s'),es:tile('ES','m/s · target ≤5'),sd:tile('SD','m/s · target ≤1.5')};
+  box.appendChild(el('div',{class:'scs'},t.n,t.last,t.avg,t.es,t.sd));
+  const mv=el('div',{class:'note mvcmp'});box.appendChild(mv);
+  const tb=el('tbody');
+  const head=el('tr',null,el('th',null,'#'),el('th',null,'Time'),el('th',null,'m/s'),el('th',null,'fps'),...extraCols.map(c=>el('th',null,c)));
+  box.appendChild(el('div',{class:'shotwrap'},el('table',{class:'shots'},el('thead',null,head),tb)));
+  box.appendChild(el('div',{class:'row',style:'margin-top:8px'},el('button',{class:'sm warn',onclick:()=>{d.shots=[];renderShots(d);log(d,'Shot string reset.');}},'Reset string')));
+  d.ui.shot={t,tb,extraCols,mv};renderShots(d);
+}
+function addShot(d,ms,extra,src){
+  if(!(ms>0&&ms<3048)){log(d,'  rejected implausible velocity '+ms,'er');return;}
+  d.shots.push({ms,t:ts().slice(0,8),extra:extra||[]});
+  log(d,'SHOT #'+d.shots.length+'  '+ms.toFixed(2)+' m/s ('+(ms/FPS).toFixed(1)+' fps)'+(extra&&extra.length?'  '+extra.join(' · '):'')+(src?'  ['+src+']':''),'shot');
+  renderShots(d);
+}
+function renderShots(d){
+  const u=d.ui.shot;if(!u)return;const s=stats(d.shots.map(x=>x.ms));
+  u.t.n.v.textContent=d.shots.length;
+  u.t.last.v.textContent=d.shots.length?d.shots[d.shots.length-1].ms.toFixed(2):'—';
+  u.t.avg.v.textContent=s?s.mean.toFixed(2):'—';
+  u.mv.textContent=mvCompareText(s);
+  u.t.es.v.textContent=s&&s.n>1?s.es.toFixed(2):'—';u.t.es.v.className='v'+(s&&s.n>1?(s.es<=5?' ok':' bad'):'');
+  u.t.sd.v.textContent=s&&s.n>1?s.sd.toFixed(2):'—';u.t.sd.v.className='v'+(s&&s.n>1?(s.sd<=1.5?' ok':' bad'):'');
+  u.tb.textContent='';
+  for(let i=d.shots.length-1;i>=Math.max(0,d.shots.length-100);i--){
+    const x=d.shots[i];
+    u.tb.appendChild(el('tr',null,el('td',null,String(i+1)),el('td',null,x.t),el('td',null,x.ms.toFixed(2)),el('td',null,(x.ms/FPS).toFixed(1)),...u.extraCols.map((_,j)=>el('td',null,x.extra[j]!=null?String(x.extra[j]):'—'))));
+  }
+}
+
+/* V1.7.0 rangefinder UI: rangings in metres (yards shown alongside), angle in whole degrees as sent */
+function buildRangeUI(d,box,note){
+  const t={n:tile('Rangings'),m:tile('Distance','m'),deg:tile('Angle','°')};
+  box.appendChild(el('div',{class:'scs'},t.n,t.m,t.deg));
+  const tb=el('tbody');
+  box.appendChild(el('div',{class:'shotwrap'},el('table',{class:'shots'},el('thead',null,el('tr',null,...['#','Time','m','yd','Angle °','Sent'].map(h=>el('th',null,h)))),tb)));
+  box.appendChild(el('div',{class:'row',style:'margin-top:8px'},el('button',{class:'sm warn',onclick:()=>{d.ranges=[];renderRanges(d);log(d,'Rangings cleared.');}},'Clear')));
+  box.appendChild(el('div',{class:'note'},note));
+  d.ui.rng={t,tb};renderRanges(d);
+}
+function addRange(d,r){
+  if(!(r.m>0&&r.m<5000)){log(d,'  rejected implausible distance '+r.m,'er');return;}
+  d.ranges=d.ranges||[];d.ranges.push({m:r.m,deg:r.deg,raw:r.raw,t:ts().slice(0,8)});
+  log(d,'RANGE #'+d.ranges.length+'  '+r.m.toFixed(1)+' m'+(r.deg!=null?'  '+(r.deg>0?'+':'')+r.deg+'°':'  (no angle)')+'  ['+r.raw+']','shot');
+  renderRanges(d);
+}
+function renderRanges(d){
+  const u=d.ui.rng;if(!u)return;const R=d.ranges||[],L=R[R.length-1];
+  u.t.n.v.textContent=R.length;u.t.m.v.textContent=L?L.m.toFixed(1):'—';u.t.deg.v.textContent=L&&L.deg!=null?(L.deg>0?'+':'')+L.deg:'—';
+  u.tb.textContent='';
+  for(let i=R.length-1;i>=Math.max(0,R.length-100);i--){const x=R[i];
+    u.tb.appendChild(el('tr',null,el('td',null,String(i+1)),el('td',null,x.t),el('td',null,x.m.toFixed(1)),el('td',null,(x.m/YD).toFixed(1)),el('td',null,x.deg!=null?String(x.deg):'—'),el('td',null,x.raw)));}
+}
+
+/* ---------- protocol parsers ---------- */
+function asciiBytes(s,term){const o=[];for(const ch of s)o.push(ch.charCodeAt(0)&0xff);return new Uint8Array([...o,...term]);}
+const FX_DRAG=['none','G1','G7','RA4','GA'];
+function parsePocketPro(b){ // ASCII "fps,angle,bc,bc_type", optional trailing NULs
+  let end=b.length;while(end>0&&b[end-1]===0)end--;
+  const f=new TextDecoder().decode(b.slice(0,end)).trim().split(',');
+  if(f.length<4)return null;
+  const fps=parseFloat(f[0]),angle=parseFloat(f[1]),bc=parseFloat(f[2]),type=parseInt(f[3],10);
+  if(!isFinite(fps)||fps<=0||fps>10000||!isFinite(angle)||!isFinite(bc)||bc<0||isNaN(type))return null;
+  return {fps,angle,bc,type};
+}
+const TB_DRAG={0:'Basic',1:'G1 (legacy)',2:'G7 (legacy)',3:'G1',4:'G7',5:'RA4',6:'GA'};
+function parseTrueBallistic(b){ // 0x0A simple (20 B) / 0x0B ballistic / 0x0C polynomial; uint24 BE doppler count
+  if(b.length<4)return null;const type=b[0];
+  if(type!==0x0A&&type!==0x0B&&type!==0x0C)return null;
+  if(type===0x0A&&b.length!==20)return null;
+  const raw=(b[1]<<16)|(b[2]<<8)|b[3];
+  const hz=Math.trunc(10525/24080*raw);if(hz<=0)return null;
+  const ms=hz*299792458/10525000000/2;if(ms>3048)return null;
+  let bc=null,drag=null;
+  if(type===0x0B&&b.length>=9){const v=new DataView(b.buffer,b.byteOffset+4,4).getFloat32(0,false);if(isFinite(v)&&v>0){bc=v;drag=TB_DRAG[b[8]]||('id '+b[8]);}}
+  return {type,hz,ms,bc,drag};
+}
+function parseTB3P(b){ // "%05u-%05u-%05u" tenths of fps @0/50/100 m
+  if(b.some(x=>x<0x20||x>0x7e))return null;
+  const p=String.fromCharCode(...b).trim().split('-');
+  if(p.length!==3||p.some(x=>!/^\d{5}$/.test(x)))return null;
+  const v=p.map(x=>parseInt(x,10)/10);return v[0]>0?v:null;
+}
+function parseFxBroadcast(b){ // manufacturer data (company 0x0059 stripped)
+  if(b.length<15||b[0]!==0x30)return null;
+  const model=FX_BCAST_UUID[hexOf(b.slice(6,10)).replace(/ /g,'')];if(!model)return null;
+  return {model,fwMajor:b[2]|(b[3]<<8),fwMinor:b[4],batt:b[10],counter:(b[11]<<8)|b[12],fps:(b[13]<<8)|b[14]};
+}
+
+/* ---------- V1.7.0 rangefinder parsers (YD = 0.9144 m, declared with the capture finder) ---------- */
+function parseElement(b){ // F5 · distance uint16 BE ×0.1 m (always metres) · angle int8 whole degrees
+  if(b.length!==4||b[0]!==0xF5)return null;
+  return{m:((b[1]<<8)|b[2])/10,deg:b[3]>127?b[3]-256:b[3]};
+}
+function aeaDist(v){const m=/^\s*([\d.]+)\s*([my])\s*$/i.exec(String(v));if(!m)return null;const x=parseFloat(m[1]);
+  return isFinite(x)?{m:/y/i.test(m[2])?x*YD:x,raw:m[1]+m[2].toLowerCase()}:null;}
+function aeaLine(st,line){ // returns a finished ranging or null; st carries a distance waiting for its angle
+  let m;
+  if(line.startsWith('#point#')){
+    let j=null;try{j=JSON.parse(line.slice(7));}catch(e){return null;}
+    const dd=j&&aeaDist(j.distance),a=j?Number(j.angle):NaN;
+    return dd&&isFinite(a)?{m:dd.m,deg:a,raw:dd.raw,fmt:'JSON'}:null;
+  }
+  if((m=/Dist\s*:\s*([\d.]+\s*[my])/i.exec(line))){const dd=aeaDist(m[1]);const prev=st.pend;st.pend=dd;return prev?{m:prev.m,deg:null,raw:prev.raw,fmt:'text'}:null;}
+  if((m=/Angle\s*:\s*([+-]?\d+(?:\.\d+)?)/i.exec(line))&&st.pend){const r={m:st.pend.m,deg:parseFloat(m[1]),raw:st.pend.raw,fmt:'text'};st.pend=null;return r;}
+  return null;
+}
+/* ---------- V1.7.0 LabRadar LX frames ----------
+   01 · cmd · seq u16 BE · len u32 BE · payload · CRC16 BE. Reply = cmd|0x80; events carry seq 0.
+   CRC: reflected CCITT polynomial (0x8408), init 0xBEEF, final XOR 0xFFFF, over the whole frame before the CRC —
+   found from the owner's snoops and checked on all 341 frames of both sessions. */
+function lrCrc(b){let c=0xBEEF;for(const x of b){c^=x;for(let i=0;i<8;i++)c=(c&1)?(c>>>1)^0x8408:c>>>1;}return (c^0xFFFF)&0xFFFF;}
+function lrFrame(cmd,seq,payload){
+  const p=payload||[],L=p.length;
+  const f=[1,cmd,(seq>>8)&255,seq&255,(L>>>24)&255,(L>>16)&255,(L>>8)&255,L&255,...p];const c=lrCrc(f);
+  return new Uint8Array([...f,c>>8,c&255]);
+}
+/* 64-byte block the LabRadar app sends as cmd 0x1A right after cmd 0x06. Byte-identical in two sessions a day
+   apart (30 + 31 Oct 2026), and the 0x86 reply before it is identical too, so it is a fixed app key, not an
+   answer to a challenge. Answer 0x9A 00 = accepted. */
+const LR_KEY=[0x72,0xd5,0x64,0xce,0x01,0xf0,0xe2,0x6a,0x7b,0x32,0x3b,0x6c,0x9c,0x30,0xa2,0x0a,0x86,0x5b,0x44,0x49,0x08,0x81,0x5e,0x50,0x9c,0x65,0x3c,0x7f,0x3b,0x89,0x7f,0x6f,
+  0x11,0x34,0x12,0x6c,0x75,0x0d,0x7f,0xf1,0x79,0x85,0x77,0xa1,0x56,0xa0,0x2e,0x2b,0xf9,0x85,0x52,0x3f,0xa2,0xa3,0xc8,0xe6,0xa2,0x88,0xf0,0xe1,0x09,0x52,0x4f,0xe9];
+function lrTake(st,b){ // reassemble frames across notifications; returns complete frames, drops junk and bad CRCs
+  st.lrBuf=(st.lrBuf||[]).concat(Array.from(b));const out=[];
+  for(;;){
+    const B=st.lrBuf;let i=B.indexOf(1);if(i<0){st.lrBuf=[];break;}if(i>0)B.splice(0,i);
+    if(B.length<10)break;
+    const L=((B[4]<<24)>>>0)+(B[5]<<16)+(B[6]<<8)+B[7];
+    if(L>4096){B.splice(0,1);continue;}
+    if(B.length<10+L)break;
+    const f=B.splice(0,10+L);
+    if(lrCrc(f.slice(0,-2))!==((f[f.length-2]<<8)|f[f.length-1])){out.push({bad:true,f});continue;}
+    out.push({cmd:f[1],seq:(f[2]<<8)|f[3],p:f.slice(8,-2)});
+  }
+  return out;
+}
+function lrShot(p){ // event 0x20: 15 float32 BE (−1 = unused) + 6 bytes; mapped against the LabRadar CSV export
+  if(p.length<66)return null;
+  const v=new DataView(new Uint8Array(p).buffer),f=i=>v.getFloat32(i*4,false);
+  const o={dist:f(0),v0:f(5),vd:f(6),pf:f(11),massG:f(12),series:(p[61]<<8)|p[62],shot:p[63]};
+  return o.v0>0?o:null;
+}
+
+/* ---------- profiles ---------- */
+const PROFILES={
+  calypso:{
+    name:'Calypso Mini (wind)',
+    // V1.6.1: by name only. FFF1/FFF2 on the ISSC service is a stock module layout (the Vector Paragon
+    // rangefinder has it too) and auto-init writes the handshake, so a shape match wrote to a foreign device.
+    match:(d)=>/^WDOT-/i.test(d.name||''),
+    need:[FFF2],
+    ui(d,box){
+      const t={live:el('span',{class:'tag'}),spd:tile('Instant','m/s'),avg:tile('Average','m/s'),dir:tile('Direction','deg'),batt:tile('Battery 2A19','%'),gk:tile(':GK id / f2'),fw:tile('Firmware :VR'),wu:tile(':WU frames'),ak:tile(':AK acks'),na:tile(':NA rejects'),idle:tile('HDLC idle')};
+      t.gk.v.className='v small';t.fw.v.className='v small';
+      box.appendChild(el('div',{class:'row'},el('span',{style:'flex:0 0 auto'},'Stream: '),t.live));
+      box.appendChild(el('div',{class:'scs'},t.spd,t.avg,t.dir,t.batt));
+      box.appendChild(el('div',{class:'scs'},t.gk,t.fw,t.wu,t.ak,t.na,t.idle));
+      const kab=el('button',{style:'flex:1 1 auto',onclick:()=>d.st.ka?calStopKa(d):calStartKa(d)},'Start :CC keepalive');
+      box.appendChild(el('div',{class:'row',style:'margin-top:10px'},el('button',{class:'gold',style:'flex:1 1 auto',onclick:()=>calHandshake(d)},'Send full handshake'),kab));
+      const steps=el('div',{class:'steps'});
+      [calToken(d)||Object.values(CAL_UNLOCK)[0],...HANDSHAKE,KEEPALIVE].forEach((s,i)=>{const b=el('button',{onclick:()=>calSend(d,s,b,'(manual step)',true)},(i+1)+' '+s);steps.appendChild(b);});
+      box.appendChild(el('div',{class:'lbl'},'Step by step, a few seconds apart: green = real data back within 1.5 s, orange = silence'));
+      box.appendChild(steps);
+      d.ui.cal={t,kab,steps};
+      for(const k of ['wu','ak','na','idle'])t[k].v.textContent=d.st[k]||0;
+      calTag(d);
+    },
+    async init(d){if($('optInit').checked&&d.chars.has(FFF1)){log(d,'Auto-handshake in 600 ms…');await sleep(600);await calHandshake(d);}},
+    quiet(d,uuid,b){ // collapse repeated idle frames
+      if(uuid!==FFF2||!(b.length>=4&&b[0]===0x7e&&b[b.length-1]===0x7e))return false;
+      return $('hideIdle').checked&&(d.st.idleRun++)>0;
+    },
+    rx(d,uuid,b){
+      if(uuid===BATT&&b.length){d.ui.cal&&(d.ui.cal.t.batt.v.textContent=b[0]);return;}
+      if(uuid!==FFF2)return;
+      if(b.length>=4&&b[0]===0x7e&&b[b.length-1]===0x7e){calBump(d,'idle');calTag(d);return;}
+      d.st.idleRun=0;d.st.lastData=Date.now();
+      d.st.buf=(d.st.buf||'')+new TextDecoder().decode(b);
+      const parts=d.st.buf.split('\r');d.st.buf=parts.pop();
+      if(d.st.buf.length>512){log(d,'  buffer overflow, flushed','er');d.st.buf='';}
+      for(const raw of parts){const s=raw.trim();if(s)calSentence(d,s);}
+    },
+    stop(d){calStopKa(d);}
+  },
+  fxpro:{
+    name:'FX Pocket Pro (chrono, GATT)',
+    match:(d)=>/^FX Pocket Pro/i.test(d.name)||d.svcs.has(VRS),
+    need:[VRS_VEL],
+    ui(d,box){buildShotUI(d,box,['angle','BC','drag']);box.appendChild(el('div',{class:'note'},'VRS notify ASCII "fps,angle,bc,bc_type". Protocol from the community MIT client jtfiskar/flutter-fx-pocket-chrono; not confirmed by FX.'));},
+    rx(d,uuid,b){
+      if(uuid!==VRS_VEL)return;
+      const p=parsePocketPro(b);
+      if(!p){log(d,'  VRS payload did not parse: "'+ascOf(b)+'"','er');return;}
+      addShot(d,p.fps*FPS,[p.angle.toFixed(1),p.bc>0?p.bc.toFixed(3):'—',FX_DRAG[p.type]||('id '+p.type)],'VRS');
+    }
+  },
+  truebal:{
+    name:'FX True Ballistic (radar, GATT)',
+    match:(d)=>/^vXfS3c6k/.test(d.name)||d.svcs.has(TB),
+    need:[TB_SHOT,TB_3P],
+    ui(d,box){buildShotUI(d,box,['type','BC','drag','v50 m/s','v100 m/s']);box.appendChild(el('div',{class:'note'},'Shot packet 0x0A/0x0B/0x0C on 1624, fitted 0/50/100 m velocities on 162B. Decoding from the community MIT client; not confirmed by FX.'));},
+    rx(d,uuid,b){
+      if(uuid===TB_SHOT){
+        const p=parseTrueBallistic(b);if(!p){log(d,'  TB packet ignored (type 0x'+(b[0]||0).toString(16)+', '+b.length+' B)');return;}
+        addShot(d,p.ms,['0x'+p.type.toString(16).toUpperCase(),p.bc!=null?p.bc.toFixed(3):'—',p.drag||'—'],p.hz+' Hz');
+      }else if(uuid===TB_3P){
+        const v=parseTB3P(b);if(!v)return;
+        log(d,'  fitted: '+v.map(x=>x?(x*FPS).toFixed(1)+' m/s':'—').join(' / ')+' @ 0/50/100 m','hl');
+        const last=d.shots[d.shots.length-1];
+        if(last){last.extra[3]=v[1]?(v[1]*FPS).toFixed(1):'—';last.extra[4]=v[2]?(v[2]*FPS).toFixed(1):'—';renderShots(d);}
+      }
+    }
+  },
+  fxbcast:{
+    name:'FX Pocket V2/D1 (chrono, broadcast)',
+    match:()=>false, // only via advert detection or manual choice
+    need:[],
+    ui(d,box){
+      const t={model:tile('Model'),batt:tile('Battery','%'),ctr:tile('Shot counter')};
+      box.appendChild(el('div',{class:'scs'},t.model,t.batt,t.ctr));d.ui.fxb=t;
+      buildShotUI(d,box,[]);
+      box.appendChild(el('div',{class:'note'},'Velocity is read from advertisement manufacturer data (company 0x0059), so "Watch adverts" must be running. A shot is counted when the shot counter changes.'));
+    },
+    advert(d,b){
+      const p=parseFxBroadcast(b);if(!p)return;
+      if(d.ui.fxb){d.ui.fxb.model.v.textContent=p.model+' fw '+p.fwMajor+'.'+p.fwMinor;d.ui.fxb.model.v.className='v small';d.ui.fxb.batt.v.textContent=p.batt;d.ui.fxb.ctr.v.textContent=p.counter;}
+      if(d.st.lastCounter==null){d.st.lastCounter=p.counter;log(d,'  FX '+p.model+' baseline counter '+p.counter,'hl');return;}
+      if(p.counter!==d.st.lastCounter&&p.fps>0){d.st.lastCounter=p.counter;addShot(d,p.fps*FPS,[],'advert ctr '+p.counter);}
+    }
+  },
+  element:{ // V1.7.0, LAB-04. Read-only.
+    name:'Element Titan / Helix (rangefinder)',
+    match:(d)=>/^(titan|helix|element)/i.test(d.name||'')||d.chars.has(NUS_TX), // NUS is generic, but this profile never writes
+    need:[NUS_TX],
+    ui(d,box){buildRangeUI(d,box,'Nordic UART notify, 4 bytes per ranging: F5 · distance uint16 BE in 0.1 m · angle int8 °. Always metres over Bluetooth, whatever the display unit. The unit sends the distance of the mode on its display (LOS or HCD, no flag) → keep it in LOS. Nothing is written to the rangefinder.');},
+    rx(d,uuid,b){
+      if(uuid!==NUS_TX)return;
+      const r=parseElement(b);if(!r){log(d,'  not an Element ranging frame ('+b.length+' B)','er');return;}
+      addRange(d,{m:r.m,deg:r.deg,raw:hexOf(b)});
+    }
+  },
+  aea:{ // V1.7.0, LAB-05. Read-only.
+    name:'AEA BC1500 (rangefinder)',
+    match:(d)=>/^AEA/i.test(d.name||''),
+    need:[DSPS_TX],
+    ui(d,box){buildRangeUI(d,box,'DSPS notify, ASCII lines ending CR LF: "HTZGDDist :113.0m" + "HTZGDAngle:+1", or one "#point#{…}" JSON line. m or y (yards → metres here); angle whole degrees. Open: what switches the format, and whether the distance is line-of-sight or horizontal. Nothing is written to the rangefinder.');},
+    rx(d,uuid,b){
+      if(uuid!==DSPS_TX)return;
+      d.st.aea=d.st.aea||{buf:'',pend:null};const st=d.st.aea;
+      st.buf+=new TextDecoder().decode(new Uint8Array(b));
+      if(st.buf.length>1024){log(d,'  buffer overflow, flushed','er');st.buf='';}
+      const lines=st.buf.split('\n');st.buf=lines.pop();
+      for(const raw of lines){const line=raw.replace(/\r/g,'').trim();if(!line)continue;
+        const r=aeaLine(st,line);if(r)addRange(d,{m:r.m,deg:r.deg,raw:r.raw+' '+r.fmt});}
+    }
+  },
+  labradar:{ // V1.7.0. Writes only the LabRadar app's own start sequence, and only with auto-initialise or the button.
+    name:'LabRadar LX (chrono, GATT)',
+    match:(d)=>d.svcs.has(LR_SVC),
+    need:[LR_EVT],
+    ui(d,box){
+      const t={key:tile('App key'),arm:tile('Radar'),ser:tile('Series'),poll:tile('Status polls')};
+      t.key.v.className='v small';t.arm.v.className='v small';
+      box.appendChild(el('div',{class:'scs'},t.key,t.arm,t.ser,t.poll));
+      buildShotUI(d,box,['V@d m/s','d m','gr']);
+      box.appendChild(el('div',{class:'row',style:'margin-top:8px'},el('button',{class:'gold',style:'flex:1 1 auto',onclick:()=>lrStart(d)},'Send start sequence')));
+      box.appendChild(el('div',{class:'note'},'Each shot arrives as event 0x20 the moment the LabRadar records it: V0, the velocity V@d at its first distance point d, and the projectile mass, as in its CSV export (power factor, series and shot number in the log). The LabRadar extrapolates V at that distance when its track ends short of it, so check the track length in the LabRadar app before truing BC from it.'));
+      d.ui.lr=t;lrTags(d);
+    },
+    async init(d){if($('optInit').checked)await lrStart(d);},
+    rx(d,uuid,b){
+      if(uuid!==LR_EVT)return;
+      for(const fr of lrTake(d.st,b)){
+        if(fr.bad){log(d,'  LabRadar frame with bad CRC dropped','er');continue;}
+        const p=fr.p;
+        if(fr.cmd===0x9a){d.st.lrKey=p[0]===0?'accepted':'REJECTED ('+(p[0]||0)+')';log(d,'  app key '+d.st.lrKey,p[0]===0?'hl':'er');if(p[0]===0)lrStartPoll(d);}
+        else if(fr.cmd===0x86)log(d,'  device info '+hexOf(p),'hl');
+        else if(fr.cmd===0x81){d.st.lrPolls=(d.st.lrPolls||0)+1;}
+        else if(fr.cmd===0x27&&p.length>=2){d.st.lrSeries=(p[0]<<8)|p[1];log(d,'  current series '+d.st.lrSeries,'hl');}
+        else if(fr.cmd===0x25){d.st.lrArmed=p[0]===1;log(d,'  radar '+(d.st.lrArmed?'ARMED':'stopped'),'hl');}
+        else if(fr.cmd===0x20){const s=lrShot(p);if(!s){log(d,'  shot event did not parse ('+p.length+' B)','er');continue;}
+          addShot(d,s.v0,[s.vd>0?s.vd.toFixed(2):'—',s.dist>0?s.dist.toFixed(1):'—',s.massG>0?(s.massG*GR_PER_G).toFixed(2):'—'],'series '+s.series+' · shot '+s.shot+(s.pf>0?' · PF '+s.pf.toFixed(2):'')+' · event 0x20');}
+        else log(d,'  cmd 0x'+fr.cmd.toString(16)+' ['+p.length+' B]');
+        lrTags(d);
+      }
+    },
+    stop(d){lrStopPoll(d);}
+  },
+  generic:{
+    name:'Generic / unknown',
+    match:()=>true,
+    need:[],
+    ui(d,box){box.appendChild(el('div',{class:'note'},'No decoder. Every subscribed characteristic and advert is logged as hex + ASCII. Use the manual write panel to experiment, Save the log, and send it over for protocol work.'));}
+  }
+};
+const MATCH_ORDER=['fxpro','truebal','calypso','labradar','element','aea','generic'];
+
+/* ---------- V1.7.0 LabRadar helpers (per device) ---------- */
+const GR_PER_G=15.4323584;
+function lrTags(d){const t=d.ui.lr;if(!t)return;t.key.v.textContent=d.st.lrKey||'—';t.arm.v.textContent=d.st.lrArmed==null?'—':d.st.lrArmed?'armed':'stopped';
+  t.ser.v.textContent=d.st.lrSeries!=null?String(d.st.lrSeries):'—';t.poll.v.textContent=d.st.lrPolls||0;}
+async function lrSend(d,cmd,payload){
+  const c=d.chars.get(LR_CMD);if(!c){log(d,'LabRadar command characteristic not available','er');return;}
+  d.st.lrSeq=((d.st.lrSeq||0)+1)&0xffff;const f=lrFrame(cmd,d.st.lrSeq,payload);
+  try{await gattWrite(d,c,f,'wr');log(d,'TX→LR cmd 0x'+cmd.toString(16).padStart(2,'0')+' ['+f.length+' B]','hs');}catch(e){log(d,'LR write failed: '+e.message,'er');}
+}
+async function lrStart(d){
+  const en=d.chars.get(LR_EN);
+  if(en){try{await gattWrite(d,en,new Uint8Array([1]),'wr');log(d,'TX→LR enable 01','hs');}catch(e){log(d,'LR enable write failed: '+e.message,'er');}}
+  d.st.lrKey='sent…';lrTags(d);
+  await lrSend(d,0x06);await sleep(150);
+  await lrSend(d,0x1a,LR_KEY);
+}
+function lrStartPoll(d){if(d.st.lrPoll)return;d.st.lrPoll=setInterval(()=>{if(d.connected)lrSend(d,0x01);},10000);lrSend(d,0x01);}
+function lrStopPoll(d){if(d.st.lrPoll){clearInterval(d.st.lrPoll);d.st.lrPoll=null;}}
+
+/* ---------- Calypso helpers (per device) ---------- */
+function calBump(d,k){d.st[k]=(d.st[k]||0)+1;if(d.ui.cal)d.ui.cal.t[k].v.textContent=d.st[k];}
+function calTag(d){
+  const t=d.ui.cal&&d.ui.cal.t.live;if(!t)return;const age=(Date.now()-(d.st.lastWu||0))/1000;
+  if(d.st.lastWu&&age<3){t.className='tag live';t.textContent='LIVE · '+d.st.wu+' :WU';}
+  else if(d.st.lastWu){t.className='tag stale';t.textContent='STALE '+age.toFixed(0)+' s';}
+  else if(d.st.na){t.className='tag stale';t.textContent='REJECTED (:NA) · no stream';}
+  else if(d.st.idle){t.className='tag idle';t.textContent='IDLE · needs handshake';}
+  else{t.className='tag';t.textContent=d.connected?'no data yet':'disconnected';}
+}
+function calSentence(d,s){
+  const t=d.ui.cal&&d.ui.cal.t;
+  if(s.startsWith(':WU')){
+    const f=s.split(',');
+    if(f.length>=5&&f[1]==='2'){
+      if(t){t.spd.v.textContent=parseFloat(f[2]).toFixed(1);t.avg.v.textContent=parseFloat(f[3]).toFixed(1);t.dir.v.textContent=Math.round(parseFloat(f[4]));}
+      d.st.lastWu=Date.now();d.st.wind={avg:parseFloat(f[3]),dir:parseFloat(f[4]),t:d.st.lastWu};calBump(d,'wu');calTag(d);
+      log(d,'  → :WU inst='+f[2]+' avg='+f[3]+' dir='+f[4]+' ('+f.length+' fields)','wu');
+    }else log(d,'  → :WU non-standard ('+f.length+' fields): '+s,'hl');
+  }else if(s.startsWith(':GK')){
+    const f=s.split(',');if(f.length>=3)calGK(d,f[1],f[2]);else{d.st.pendingGK=f[1]||'';}
+  }else if(d.st.pendingGK!=null&&s.startsWith(',')){calGK(d,d.st.pendingGK,s.slice(1).trim());d.st.pendingGK=null;}
+  else if(s.startsWith(':VR')){const f=s.split(',');if(t)t.fw.v.textContent=(f[1]||'?').trim()+' '+(f[2]||'').trim();log(d,'  → '+s,'hl');}
+  else if(s.startsWith(':AK')){d.st.reply='AK';calBump(d,'ak');log(d,'  → :AK','hl');}
+  else if(s.startsWith(':NA')){d.st.reply='NA';calBump(d,'na');calTag(d);log(d,'  → :NA  (command REJECTED'+(d.st.lastTx?' — last TX '+d.st.lastTx:'')+')','er');}
+  else if(s.startsWith(':CC')){log(d,'  → '+s);}
+  else log(d,'  → UNKNOWN: '+s,'hl');
+}
+function calGK(d,id,f2){if(d.ui.cal)d.ui.cal.t.gk.v.textContent=id+' / '+f2;log(d,'  → :GK id='+id+' field2='+f2+' (not reliably battery: use 2A19)','hl');}
+async function calSend(d,s,btn,why,watch){
+  const c=d.chars.get(FFF1);if(!c){log(d,'FFF1 not available','er');return;}
+  const b=asciiBytes(s,[13,13]);
+  try{await gattWrite(d,c,b,'auto');d.st.lastTx=s;log(d,'TX→FFF1 '+s+'  ['+hexOf(b)+'] '+(why||''),'hs');}
+  catch(e){log(d,'TX ERROR '+s+': '+e.message,'er');return;}
+  if(btn){btn.classList.remove('reply','silent');btn.classList.add('done');
+    if(watch){const t0=Date.now();setTimeout(()=>{btn.classList.remove('done');btn.classList.add((d.st.lastData||0)>t0?'reply':'silent');},1500);}}
+}
+async function calHandshake(d){
+  log(d,'=== HANDSHAKE START ===','hs');
+  const btns=d.ui.cal?d.ui.cal.steps.querySelectorAll('button'):[];
+  await calUnlock(d,btns[0]);await sleep(120);
+  for(let i=0;i<HANDSHAKE.length;i++){await calSend(d,HANDSHAKE[i],btns[i+1],'('+(i+2)+'/'+(HANDSHAKE.length+1)+')');await sleep(120);}
+  await calSend(d,KEEPALIVE,btns[HANDSHAKE.length+1],'(initial)');
+  log(d,'=== HANDSHAKE SENT ===','hs');calStartKa(d);
+}
+function calToken(d){return CAL_UNLOCK[(d.name||'').toUpperCase()]||null;}
+async function calUnlock(d,btn){ // this unit's token first, then every other known token until one is :AK'd
+  const own=calToken(d),all=Object.values(CAL_UNLOCK);
+  for(const tok of own?[own,...all.filter(t=>t!==own)]:all){
+    d.st.reply=null;
+    await calSend(d,tok,btn,own===tok?'(1/6 unlock: this unit)':'(1/6 unlock: trying known token)');
+    const t0=Date.now();while(!d.st.reply&&Date.now()-t0<800)await sleep(40);
+    if(d.st.reply==='AK'){log(d,'Unlocked with '+tok+(own===tok?'':' (not this unit\'s listed token: add "'+d.name+'" to CAL_UNLOCK)'),'hl');return tok;}
+  }
+  log(d,'No known :DU token unlocks "'+d.name+'". Capture it once: Anemotracker + HCI snoop, take the :DU from its FFF1 writes.','er');
+  return null;
+}
+function calStartKa(d){
+  if(d.st.ka)return;d.st.ka=setInterval(()=>{if(d.connected)calSend(d,KEEPALIVE,null,'(keepalive)');},10000);
+  if(d.ui.cal)d.ui.cal.kab.textContent='Stop :CC keepalive';log(d,'Keepalive started (10 s).');
+}
+function calStopKa(d){if(d.st.ka){clearInterval(d.st.ka);d.st.ka=null;log(d,'Keepalive stopped.');}if(d.ui.cal)d.ui.cal.kab.textContent='Start :CC keepalive';}
+
+/* ---------- GATT with a per-device operation queue ---------- */
+function enqueue(d,fn){const p=d.q.then(fn);d.q=p.catch(()=>{});return p;}
+function gattWrite(d,c,bytes,mode){
+  return enqueue(d,()=>{
+    if(mode==='nr'||(mode==='auto'&&c.properties.writeWithoutResponse))return c.writeValueWithoutResponse(bytes);
+    return c.writeValueWithResponse(bytes);
+  });
+}
+
+/* ---------- devices ---------- */
+const DEVICES=[];let devSeq=0;
+function parseList(str,asNum){return str.split(',').map(s=>s.trim().toLowerCase()).filter(Boolean).map(s=>(/^(0x)?[0-9a-f]{1,4}$/.test(s))?parseInt(s,16):s);}
+async function addDevice(){
+  if(!(navigator.bluetooth&&navigator.bluetooth.requestDevice)){alert('Web Bluetooth not available. Use Chrome on Android or Chrome/Edge desktop over HTTPS (not iOS).');return;}
+  let dev;
+  try{
+    const wide=$('optWide')&&$('optWide').checked;
+    dev=await navigator.bluetooth.requestDevice({acceptAllDevices:true,
+      optionalServices:[...new Set([...BASE_SVCS,...(wide?WIDE_SVCS:[]),...parseList($('extraSvc').value)])],
+      optionalManufacturerData:[...BASE_MFR,...parseList($('extraMfr').value).filter(x=>typeof x==='number')]});
+  }catch(e){log(null,'Chooser: '+e.message+(e.name!=='NotFoundError'&&$('optWide').checked?' — if this repeats, untick "Wide service net" and try again.':''),e.name==='NotFoundError'?'sys':'er');return;}
+  await attach(dev,$('optGatt').checked);
+}
+async function attach(dev,doGatt){
+  const ex=DEVICES.find(x=>x.dev.id===dev.id);
+  if(ex){log(ex,'Already in the list: reconnecting.');if(doGatt)await connect(ex);return ex;}
+  const n=++devSeq;
+  const d={n,dev,name:dev.name||'(no name)',label:'D'+n,color:COLORS[(n-1)%COLORS.length],profile:'generic',
+    chars:new Map(),svcs:new Set(),advUuids:new Set(),writables:[],subscribed:new Set(),q:Promise.resolve(),st:{idleRun:0},ui:{},shots:[],connected:false,watching:false,adSeen:0,lastAd:''};
+  DEVICES.push(d);buildCard(d);refreshFilter();
+  log(d,'Added "'+d.name+'" id='+dev.id,'hl');
+  dev.addEventListener('gattserverdisconnected',()=>onDisconnect(d));
+  dev.addEventListener('advertisementreceived',ev=>onAdvert(d,ev));
+  if(doGatt){await connect(d);if($('optAds').checked)watchAds(d);}
+  else{log(d,'GATT skipped: watching adverts only.');watchAds(d);}
+  return d;
+}
+async function connect(d){
+  setDot(d,'scan','Connecting…');
+  try{
+    let server=null;
+    for(let a=1;a<=3;a++){
+      try{server=await d.dev.gatt.connect();await sleep(500);log(d,'GATT connected (attempt '+a+')');break;}
+      catch(e){log(d,'connect attempt '+a+' failed: '+e.message,'er');if(a===3)throw e;await sleep(900);}
+    }
+    d.server=server;d.connected=true;d.st.idleRun=0;
+    await discover(d);
+    advCheck(d);
+    const auto=MATCH_ORDER.find(k=>PROFILES[k].match(d));
+    setProfile(d,d.ui.profSel.dataset.manual?d.profile:auto,true);
+    await subscribeNeeded(d);
+    setDot(d,'on','Connected');
+    if(PROFILES[d.profile].init)await PROFILES[d.profile].init(d);
+  }catch(e){d.connected=false;log(d,'ERROR: '+e.message,'er');setDot(d,'err','Error: '+e.message);}
+}
+async function discover(d){
+  d.chars.clear();d.svcs.clear();d.writables=[];d.subscribed.clear();
+  const box=d.ui.disco;box.textContent='';
+  let services=[];
+  try{services=await d.server.getPrimaryServices();}catch(e){log(d,'getPrimaryServices failed: '+e.message,'er');}
+  log(d,'Discovered '+services.length+' exposed primary service(s).','hl');
+  for(const svc of services){
+    const su=svc.uuid.toLowerCase();d.svcs.add(su);
+    box.appendChild(el('div',{class:'svc'},su));log(d,'SVC '+su,'hl');
+    let chars=[];
+    try{chars=await svc.getCharacteristics();
+      if(!chars.length){await sleep(300);chars=await svc.getCharacteristics();log(d,'  (empty on first try, retried: '+chars.length+' char(s))');}
+    }catch(e){box.appendChild(el('div',{class:'chr'},'(no characteristics exposed)'));log(d,'  no chars: '+e.message);continue;}
+    for(const c of chars){
+      const u=c.uuid.toLowerCase(),p=c.properties,props=[];
+      if(p.read)props.push('read');if(p.write)props.push('write');if(p.writeWithoutResponse)props.push('writeNR');if(p.notify)props.push('notify');if(p.indicate)props.push('indicate');
+      d.chars.set(u,c);if(p.write||p.writeWithoutResponse)d.writables.push(c);
+      box.appendChild(el('div',{class:'chr'},shortU(u)+'  ['+props.join(', ')+']  '+u));
+      log(d,'  CHR '+shortU(u)+' ['+props.join(', ')+']');
+      if(p.read&&$('optRead').checked){
+        try{const v=new Uint8Array((await c.readValue()).buffer);log(d,'    READ '+shortU(u)+' = '+hexOf(v)+'  "'+ascOf(v)+'"','hl');}
+        catch(e){log(d,'    read failed: '+e.message);}
+      }
+      if((p.notify||p.indicate)&&$('optSubAll').checked)await subscribe(d,c);
+    }
+  }
+  const sel=d.ui.wtarget;sel.textContent='';
+  d.writables.forEach((c,i)=>sel.appendChild(el('option',{value:String(i)},shortU(c.uuid)+' · svc '+shortU(c.service.uuid))));
+  if(!d.writables.length)sel.appendChild(el('option',{value:''},'(no writable characteristic)'));
+  else{const i=d.writables.indexOf(d.chars.get(FFF1));sel.value=String(Math.max(0,i));}
+}
+async function subscribe(d,c){
+  const u=c.uuid.toLowerCase();if(d.subscribed.has(u))return;
+  try{await c.startNotifications();c.addEventListener('characteristicvaluechanged',ev=>onRx(d,u,new Uint8Array(ev.target.value.buffer.slice(ev.target.value.byteOffset,ev.target.value.byteOffset+ev.target.value.byteLength))));d.subscribed.add(u);log(d,'    subscribed '+shortU(u),'hl');}
+  catch(e){log(d,'    subscribe '+shortU(u)+' failed: '+e.message,'er');}
+}
+async function subscribeNeeded(d){for(const u of PROFILES[d.profile].need){const c=d.chars.get(u);if(c&&(c.properties.notify||c.properties.indicate))await subscribe(d,c);}}
+function onRx(d,u,b){
+  capRecord(d,'rx',shortU(u),b);
+  const P=PROFILES[d.profile];
+  if(!(P.quiet&&P.quiet(d,u,b)))log(d,'RX['+shortU(u)+'] ['+b.length+'B] '+hexOf(b)+'  "'+ascOf(b)+'"',P.need.includes(u)||(d.profile==='calypso'&&u===FFF2)?'rx':'other');
+  if(P.rx)P.rx(d,u,b);
+}
+function onDisconnect(d){
+  d.connected=false;log(d,'GATT disconnected.','er');
+  if(PROFILES[d.profile].stop)PROFILES[d.profile].stop(d);
+  setDot(d,'','Disconnected'+(d.watching?' (still watching adverts)':''));if(d.profile==='calypso')calTag(d);
+}
+function removeDevice(d){
+  if(PROFILES[d.profile].stop)PROFILES[d.profile].stop(d);
+  try{if(d.dev.gatt.connected)d.dev.gatt.disconnect();}catch(e){}
+  try{if(d.adCtl)d.adCtl.abort();}catch(e){}
+  d.ui.card.remove();DEVICES.splice(DEVICES.indexOf(d),1);refreshFilter();renderStrip();log(null,'Removed '+d.label+' ("'+d.name+'")');
+}
+async function watchAds(d){
+  if(typeof d.dev.watchAdvertisements!=='function'){log(d,'watchAdvertisements() not supported in this browser (try chrome://flags → Experimental Web Platform features).','er');return;}
+  if(d.watching){try{d.adCtl.abort();}catch(e){}d.watching=false;d.ui.adBtn.textContent='Watch adverts';log(d,'Advert watch stopped.');return;}
+  try{d.adCtl=new AbortController();await d.dev.watchAdvertisements({signal:d.adCtl.signal});d.watching=true;d.ui.adBtn.textContent='Stop adverts';log(d,'Watching advertisements…','hl');}
+  catch(e){log(d,'watchAdvertisements failed: '+e.message,'er');}
+}
+function onAdvert(d,ev){
+  d.adSeen++;
+  const parts=[];
+  ev.manufacturerData&&ev.manufacturerData.forEach((v,id)=>{const b=new Uint8Array(v.buffer.slice(v.byteOffset,v.byteOffset+v.byteLength));parts.push('mfr 0x'+id.toString(16).padStart(4,'0')+' ['+hexOf(b)+']');
+    capRecord(d,'adv','mfr '+id.toString(16).padStart(4,'0'),b);
+    if(id===0x0059&&parseFxBroadcast(b)){if(d.profile==='generic'&&!d.ui.profSel.dataset.manual){log(d,'FX Pocket broadcast detected: switching profile.','hl');setProfile(d,'fxbcast',true);}
+      if(d.profile==='fxbcast')PROFILES.fxbcast.advert(d,b);}});
+  ev.serviceData&&ev.serviceData.forEach((v,u)=>{const b=new Uint8Array(v.buffer.slice(v.byteOffset,v.byteOffset+v.byteLength));parts.push('svc '+shortU(u)+' ['+hexOf(b)+']');capRecord(d,'adv','svc '+shortU(u),b);});
+  const sig=parts.join(' ');
+  if(ev.uuids&&ev.uuids.length){const n0=d.advUuids.size;ev.uuids.forEach(u=>d.advUuids.add(String(u).toLowerCase()));if(d.advUuids.size!==n0)advCheck(d);}
+  d.ui.adInfo.textContent='adverts '+d.adSeen+' · RSSI '+ev.rssi+' dBm'+(ev.txPower!=null?' · tx '+ev.txPower:'');
+  if($('hideIdle').checked&&sig===d.lastAd)return;d.lastAd=sig;
+  log(d,'ADV rssi='+ev.rssi+' '+(sig||'(no mfr/service data)')+(ev.uuids&&ev.uuids.length?' uuids='+ev.uuids.map(shortU).join(','):''),'other');
+}
+/* V1.5.0: services the device advertises but that were not reachable over GATT (not on the list when the
+   chooser opened) — one tap adds them to the extra list for the next "+ Add device". */
+function advCheck(d){
+  const box=d.ui.advBox;if(!box)return;
+  const miss=[...d.advUuids].filter(u=>!d.svcs.has(u));
+  box.replaceChildren();if(!miss.length)return;
+  box.appendChild(el('div',{class:'note'},'Advertised but not reachable yet: '+miss.join(', ')));
+  box.appendChild(el('button',{class:'sm',onclick:()=>{const cur=parseList($('extraSvc').value).map(String);
+    $('extraSvc').value=[...new Set([...cur,...miss])].join(', ');extraSave();
+    log(d,'Added '+miss.length+' advertised service(s) to the extra list. Remove this device and tap + Add device again.','hl');}},'Add them to the service list'));
+  if(d.connected)log(d,'Advertised service(s) not reachable over GATT: '+miss.join(', '),'er');
+}
+function setDot(d,cls,txt){d.ui.dot.className='dot '+cls;d.ui.status.textContent=txt;d.ui.connBtn.textContent=d.connected?'Disconnect':'Connect';renderStrip();}
+function setProfile(d,key,auto){
+  if(PROFILES[d.profile].stop&&d.profile!==key)PROFILES[d.profile].stop(d);
+  d.profile=key;d.ui.profSel.value=key;d.ui.profTag.textContent=PROFILES[key].name;
+  d.ui.body.textContent='';d.ui.cal=null;d.ui.shot=null;d.ui.fxb=null;d.ui.rng=null;d.ui.lr=null;
+  PROFILES[key].ui(d,d.ui.body);
+  log(d,'Profile: '+PROFILES[key].name+(auto?' (auto)':' (manual)'),'hl');
+}
+function buildCard(d){
+  const dot=el('span',{class:'dot'}),status=el('span',{style:'font-size:11px;color:var(--text2)'},'Idle');
+  const lblIn=el('input',{class:'lblin',value:d.label,maxLength:10,oninput:()=>{d.label=lblIn.value||('D'+d.n);refreshFilter();}});
+  const profTag=el('span',{class:'tag prof'});
+  const connBtn=el('button',{class:'sm',onclick:()=>{if(d.connected)d.dev.gatt.disconnect();else connect(d);}},'Connect');
+  const adBtn=el('button',{class:'sm',onclick:()=>watchAds(d)},'Watch adverts');
+  const profSel=el('select',{onchange:()=>{profSel.dataset.manual='1';setProfile(d,profSel.value,false);subscribeNeeded(d);if(d.connected&&PROFILES[d.profile].init)PROFILES[d.profile].init(d);}});
+  for(const k in PROFILES)profSel.appendChild(el('option',{value:k},PROFILES[k].name));
+  const body=el('div');
+  const disco=el('div',{class:'disco'},'Not connected.');
+  const wtarget=el('select');
+  const wmode=el('select',null,el('option',{value:'ascii'},'ASCII'),el('option',{value:'hex'},'Hex bytes'));
+  const wterm=el('select',null,el('option',{value:'rr'},'\\r\\r (Calypso)'),el('option',{value:'r'},'\\r'),el('option',{value:'rn'},'\\r\\n'),el('option',{value:'n'},'\\n'),el('option',{value:'none'},'none'));
+  const wtype=el('select',null,el('option',{value:'auto'},'auto'),el('option',{value:'nr'},'without response'),el('option',{value:'wr'},'with response'));
+  const cmd=el('input',{placeholder:'ASCII or hex: 3a 47 4b 0d 0d',onkeydown:e=>{if(e.key==='Enter')manualWrite(d);}});
+  const adInfo=el('div',{class:'note'},''),advBox=el('div');
+  const card=el('div',{class:'panel dev',style:'--c:'+d.color},
+    el('h2',null,dot,lblIn,el('span',{style:'text-transform:none;letter-spacing:0;color:var(--text)'},d.name),profTag,el('span',{class:'sp'}),connBtn,adBtn,el('button',{class:'sm warn',onclick:()=>removeDevice(d)},'Remove')),
+    el('div',{class:'row'},status),
+    el('div',{class:'lbl'},'Profile (auto-detected after discovery; change to override)'),profSel,
+    body,adInfo,advBox,
+    el('details',null,el('summary',null,'Services & characteristics'),disco),
+    el('details',null,el('summary',null,'Manual write'),
+      el('div',{class:'lbl'},'Target characteristic'),wtarget,
+      el('div',{class:'row',style:'margin-top:8px'},el('div',null,el('div',{class:'lbl'},'Mode'),wmode),el('div',null,el('div',{class:'lbl'},'ASCII terminator'),wterm),el('div',null,el('div',{class:'lbl'},'Write type'),wtype)),
+      el('div',{class:'row',style:'margin-top:8px'},cmd,el('button',{class:'primary',onclick:()=>manualWrite(d)},'Send')))
+  );
+  $('devices').appendChild(card);
+  Object.assign(d.ui,{card,dot,status,profTag,connBtn,adBtn,profSel,body,disco,wtarget,wmode,wterm,wtype,cmd,adInfo,advBox});
+  setProfile(d,'generic',true);
+}
+async function manualWrite(d){
+  const c=d.writables[parseInt(d.ui.wtarget.value,10)];if(!c){alert('No writable characteristic selected (connect first).');return;}
+  const raw=d.ui.cmd.value;let bytes;
+  try{
+    if(d.ui.wmode.value==='hex'){
+      const toks=raw.replace(/0x/gi,' ').replace(/,/g,' ').trim().split(/\s+/).filter(Boolean);
+      bytes=new Uint8Array(toks.map(t=>{if(!/^[0-9a-f]{1,2}$/i.test(t))throw new Error('bad byte "'+t+'"');return parseInt(t,16);}));
+    }else bytes=asciiBytes(raw,{rr:[13,13],r:[13],rn:[13,10],n:[10],none:[]}[d.ui.wterm.value]);
+  }catch(e){alert(e.message);return;}
+  if(!bytes.length){alert('Nothing to send.');return;}
+  try{await gattWrite(d,c,bytes,d.ui.wtype.value);if(d.profile==='calypso')d.st.lastTx=raw;log(d,'TX→'+shortU(c.uuid)+' ['+hexOf(bytes)+']  "'+ascOf(bytes)+'"','tx');}
+  catch(e){log(d,'TX ERROR: '+e.message,'er');}
+}
+function refreshFilter(){
+  const sel=$('logFilter'),cur=sel.value;sel.textContent='';
+  sel.appendChild(el('option',{value:'all'},'All devices'));sel.appendChild(el('option',{value:'0'},'System only'));
+  DEVICES.forEach(d=>sel.appendChild(el('option',{value:String(d.n)},d.label+' · '+d.name)));
+  sel.value=[...sel.options].some(o=>o.value===cur)?cur:'all';
+}
+async function reconnectKnown(){
+  if(!(navigator.bluetooth&&typeof navigator.bluetooth.getDevices==='function')){alert('getDevices() is not available in this browser, so each device needs the chooser.');return;}
+  const list=await navigator.bluetooth.getDevices();
+  log(null,'getDevices(): '+list.length+' previously permitted device(s).','hl');
+  for(const dev of list)await attach(dev,$('optGatt').checked);
+}
+
+/* ---------- tabs (V1.3.0) ----------
+   Sections of ONE page, never separate pages: Web Bluetooth connections drop when the page
+   changes, so devices stay connected whichever tab is showing. Remembered tab: localStorage
+   'sen_lab_tab' (Lab namespace, storage contract with Main). */
+const TABS=['devices','capture','lane','log','data'];
+function showTab(t){
+  if(!TABS.includes(t))t='devices';
+  TABS.forEach(k=>{$('tab-'+k).hidden=k!==t;const b=$('tb-'+k);b.classList.toggle('on',k===t);b.setAttribute('aria-current',k===t?'page':'false');});
+  try{localStorage.setItem('sen_lab_tab',t);}catch(e){}
+  if(twoPane)applyPane(t);   // V1.6.0
+  if(t==='log')$('log').scrollTop=$('log').scrollHeight;
+  if(t==='capture')capRefreshDevs();
+  if(t==='lane')laneStart();else laneStop();
+}
+function renderStrip(){
+  ['strip','strip-pane'].forEach(id=>{const s=$(id);if(!s)return;s.textContent='';   // V1.6.0: also at the top of the second pane
+    if(!DEVICES.length){s.appendChild(el('span',{class:'note',style:'margin:0'},'No devices'));return;}
+    DEVICES.forEach(d=>s.appendChild(el('button',{class:'chip',style:'--c:'+d.color,onclick:()=>{showTab('devices');d.ui.card.scrollIntoView&&d.ui.card.scrollIntoView({block:'start'});}},
+      el('span',{class:'dot'+(d.connected?' on':'')}),d.label+(CAP.on?' ●':''))));});
+}
+/* ---------- V1.6.0 fold-aware second pane ----------
+   Unfolded (near-square touch screen ≥ 600 px, or a wide screen ≥ 560 px tall) the Lab shows two halves: the
+   tab on the left, and on the right what helps with it — Devices: the live log; Capture: the capture results
+   (where-the-numbers-are finder, byte-change table, GATT dump) with the log under them; Lane / Data: nothing
+   (full width, a ◧ Log button brings the log); Log: full width in its own tab. A switch at the top of the
+   pane changes it, remembered per tab (sen_lab_panes). Blocks are MOVED, never copied, so connections, the
+   log and a running capture carry on; everything goes back on folding. The outer screen is unchanged. */
+const PANE_MODES={devices:['log','cap'],capture:['cap','log'],lane:['none','log'],data:['none','log'],log:['none']};
+const PANE_BLOCKS={log:['log-panel'],cap:['capfind','capsumwrap','capdump','log-panel']};
+const PANE_LABEL={log:'Log',cap:'Capture results',none:'Hide'};
+let twoPane=false,paneShown=null,PANES={};
+try{const j=JSON.parse(localStorage.getItem('sen_lab_panes')||'{}');if(j&&typeof j==='object'&&!Array.isArray(j))PANES=j;}catch(e){}
+const curTab=()=>TABS.find(k=>!$('tab-'+k).hidden)||'devices';
+function labLayoutMode(w,h,coarse){if(w<600)return'phone';const r=w/h;return coarse&&r>=0.8&&r<=1.25?'inner':'wide';}
+const labCoarse=()=>window.matchMedia?matchMedia('(pointer: coarse)').matches:('ontouchstart' in window);
+function paneMode(t){const m=PANE_MODES[t]||['none'],c=PANES[t];return m.includes(c)?c:m[0];}
+function paneOut(){document.querySelectorAll('[data-pane-home]').forEach(mk=>{const e=$(mk.dataset.paneHome);if(e)mk.replaceWith(e);else mk.remove();});}
+function paneIn(ids){const pane=$('lab-pane');ids.forEach(id=>{const e=$(id);if(!e||e.parentNode===pane)return;const mk=document.createElement('span');mk.hidden=true;mk.dataset.paneHome=id;e.before(mk);pane.appendChild(e);});}
+function applyPane(t){
+  paneOut();
+  const m=twoPane?paneMode(t):null;paneShown=m;
+  const root=document.documentElement;root.classList.toggle('pane-none',m==='none');root.classList.toggle('pane-cap',m==='cap');
+  if(m&&m!=='none')paneIn(PANE_BLOCKS[m]);
+  const sw=$('pane-sw'),modes=PANE_MODES[t]||['none'];
+  sw.replaceChildren(...(m&&modes.length>1?modes.map(x=>el('button',{class:'sm'+(x===m?' on':''),'aria-pressed':String(x===m),onclick:()=>setPaneMode(t,x)},PANE_LABEL[x])):[]));
+  $('pane-show').style.display=m==='none'&&modes.length>1?'':'none';
+  if(m){const lg=$('log');lg.scrollTop=lg.scrollHeight;}
+}
+function setPaneMode(t,m){if(!(PANE_MODES[t]||[]).includes(m))return;PANES={...PANES,[t]:m};try{localStorage.setItem('sen_lab_panes',JSON.stringify(PANES));}catch(e){}applyPane(t);}
+function applyLabLayout(){
+  const mode=labLayoutMode(window.innerWidth,window.innerHeight,labCoarse()),two=mode==='inner'||(mode==='wide'&&window.innerHeight>=560);
+  if(two===twoPane)return;
+  twoPane=two;document.documentElement.classList.toggle('fold',two);
+  if(!two)document.documentElement.classList.remove('pane-none','pane-cap');
+  applyPane(curTab());
+}
+
+/* ---------- wind lane (V1.4.0, CORE-17 preview) ----------
+   Top-down lane: firing point at the bottom, target at the top, wind stations beside it, and the
+   bullet's sideways path bent by each station's wind. ILLUSTRATIVE, NOT DOPE.
+   Physics: point-mass RK4 on the velocity RELATIVE to the local wind (x downrange, y right), with
+   the drag form and G7 table copied from Main V1.24.2 (a = (π/8)·ρ·v·Cd/BC_si · v_rel, verified
+   there against py-ballisticcalc). Fixed Ljubljana-default air; no gravity or zero (top view only).
+   The multi-station wind model itself (nearest / blend) is NOT §20A-verified: that is CORE-17.
+   Wind convention as the Calypso and Main: direction the wind comes FROM, clockwise from the
+   station's mark, mark pointed at the target (0° headwind, 90° from the right). */
+const LANE_G7=[[0,0.1198],[0.05,0.1197],[0.1,0.1196],[0.15,0.1194],[0.2,0.1193],[0.25,0.1194],[0.3,0.1194],[0.35,0.1194],[0.4,0.1193],[0.45,0.1193],[0.5,0.1194],[0.55,0.1193],[0.6,0.1194],[0.65,0.1197],[0.7,0.1202],[0.725,0.1207],[0.75,0.1215],[0.775,0.1226],[0.8,0.1242],[0.825,0.1266],[0.85,0.1306],[0.875,0.1368],[0.9,0.1464],[0.925,0.166],[0.95,0.2054],[0.975,0.2993],[1,0.3803],[1.025,0.4015],[1.05,0.4043],[1.075,0.4034],[1.1,0.4014]];
+const LANE_RHO=1.1934,LANE_AS=343.24,LANE_LB2KG=703.07; // Ljubljana default air (V7 §3–6); §9H BC conversion
+const LANE_COL=['#7eb8c4','#d9b3ff'];
+const LANE_DEF={len:100,mv:280,bc:0.128,mode:'nearest',st:[
+  {name:'S1',side:'L',pct:10,src:'manual',spd:3,dir:90,gust:true},
+  {name:'S2',side:'R',pct:60,src:'manual',spd:4,dir:60,gust:true}]};
+const clampN=(v,lo,hi,d)=>{v=+v;return Number.isFinite(v)?Math.min(hi,Math.max(lo,v)):d;};
+function laneClean(j){ // whitelist + clamp anything read back from storage
+  const D=LANE_DEF,o={len:clampN(j.len,10,1000,D.len),mv:clampN(j.mv,50,400,D.mv),bc:clampN(j.bc,0.02,0.5,D.bc),mode:j.mode==='blend'?'blend':'nearest',st:[]};
+  for(let i=0;i<2;i++){const s=(Array.isArray(j.st)&&j.st[i])||{},d=D.st[i];
+    o.st.push({name:String(s.name||d.name).slice(0,16),side:s.side==='R'?'R':s.side==='L'?'L':d.side,pct:clampN(s.pct,1,99,d.pct),
+      src:typeof s.src==='string'?s.src:'manual',spd:clampN(s.spd,0,30,d.spd),dir:clampN(s.dir,0,359,d.dir),gust:s.gust==null?d.gust:!!s.gust});}
+  return o;
+}
+let LANE=laneClean({});
+try{const j=JSON.parse(localStorage.getItem('sen_lab_lane')||'null');if(j&&typeof j==='object')LANE=laneClean(j);}catch(e){}
+function laneSave(){try{localStorage.setItem('sen_lab_lane',JSON.stringify(LANE));}catch(e){}}
+function laneInterp(T,m){if(m<=T[0][0])return T[0][1];for(let i=1;i<T.length;i++)if(m<=T[i][0]){const[a,b]=[T[i-1],T[i]];return a[1]+(b[1]-a[1])*(m-a[0])/(b[0]-a[0]);}return T[T.length-1][1];}
+
+/* station wind now: live Calypso (rolling average, as Main uses) or manual (+ optional gusts) */
+function laneStationWind(s,i,now){
+  if(s.src!=='manual'){
+    const d=DEVICES.find(x=>String(x.n)===s.src),w=d&&d.st.wind;
+    if(d&&d.connected&&w&&now-w.t<3000)return{spd:w.avg,dir:w.dir,state:'LIVE '+d.label};
+    return{spd:0,dir:0,state:'LOST '+(d?d.label:'device')};
+  }
+  if(!s.gust)return{spd:s.spd,dir:s.dir,state:'MANUAL'};
+  const k=now/1000,ph=i*2.1;
+  return{spd:Math.max(0,s.spd*(1+0.35*Math.sin(k*0.9+ph)+0.15*Math.sin(k*2.3+ph*1.7))),dir:(s.dir+12*Math.sin(k*0.5+ph)+360)%360,state:'MANUAL · gusts'};
+}
+const laneVec=(spd,dir)=>{const r=dir*Math.PI/180;return[-spd*Math.cos(r),-spd*Math.sin(r)];}; // wind velocity (x downrange, y right)
+/* wind field along the lane from stations [{x,wx,wy}]: nearest station, or linear blend between them */
+function laneField(sts,mode){
+  const s=[...sts].sort((a,b)=>a.x-b.x);
+  return x=>{
+    if(mode==='blend'){
+      if(x<=s[0].x)return[s[0].wx,s[0].wy];
+      for(let i=1;i<s.length;i++)if(x<=s[i].x){const a=s[i-1],b=s[i],f=(x-a.x)/(b.x-a.x);return[a.wx+(b.wx-a.wx)*f,a.wy+(b.wy-a.wy)*f];}
+      const l=s[s.length-1];return[l.wx,l.wy];
+    }
+    let best=s[0];for(const t of s)if(Math.abs(x-t.x)<Math.abs(x-best.x))best=t;return[best.wx,best.wy];
+  };
+}
+/* RK4 in time; returns sideways offset y at the target, time of flight and the path [x,y,t] */
+function laneSolve(field,len,mv,bc){
+  const bcSi=bc*LANE_LB2KG,h=0.0005;
+  const der=(x,vx,vy)=>{const[wx,wy]=field(x),rx=vx-wx,ry=vy-wy,v=Math.hypot(rx,ry),k=Math.PI/8*LANE_RHO*v*laneInterp(LANE_G7,v/LANE_AS)/bcSi;return[vx,vy,-k*rx,-k*ry];};
+  let x=0,y=0,vx=mv,vy=0,t=0,n=0;const path=[[0,0,0]];let rec=len/150;
+  while(x<len&&n++<4e5&&vx>1){
+    const a=der(x,vx,vy),b=der(x+h/2*a[0],vx+h/2*a[2],vy+h/2*a[3]),c=der(x+h/2*b[0],vx+h/2*b[2],vy+h/2*b[3]),d=der(x+h*c[0],vx+h*c[2],vy+h*c[3]);
+    const nx=x+h/6*(a[0]+2*b[0]+2*c[0]+d[0]),ny=y+h/6*(a[1]+2*b[1]+2*c[1]+d[1]);
+    if(nx>=len){const f=(len-x)/(nx-x);y+=f*(ny-y);t+=f*h;x=len;path.push([x,y,t]);break;}
+    vx+=h/6*(a[2]+2*b[2]+2*c[2]+d[2]);vy+=h/6*(a[3]+2*b[3]+2*c[3]+d[3]);x=nx;y=ny;t+=h;
+    if(x>=rec){path.push([x,y,t]);rec+=len/150;}
+  }
+  return{y,t,path};
+}
+/* everything the view needs for this moment */
+function laneCompute(now){
+  const sw=LANE.st.map((s,i)=>Object.assign(laneStationWind(s,i,now),{x:s.pct/100*LANE.len}));
+  const sts=sw.map(w=>{const[wx,wy]=laneVec(w.spd,w.dir);return{x:w.x,wx,wy};});
+  const sol=laneSolve(laneField(sts,LANE.mode),LANE.len,LANE.mv,LANE.bc);
+  const share=sts.map((_,i)=>laneSolve(laneField(sts.map((t,j)=>j===i?t:{x:t.x,wx:0,wy:0}),LANE.mode),LANE.len,LANE.mv,LANE.bc).y);
+  return{sw,sts,sol,share};
+}
+
+/* ---------- view ---------- */
+const LV={on:false,raf:0,last:0,res:null,parts:[],lat:0,tSolve:0,tOut:0,sig:''};
+function laneUI(){
+  const box=$('lanest');box.textContent='';
+  LANE.st.forEach((s,i)=>{
+    const spdV=el('span',{},''),dirV=el('span',{},'');
+    const sync=()=>{spdV.textContent=s.spd.toFixed(1)+' m/s';dirV.textContent=Math.round(s.dir)+'° '+laneDirWord(s.dir);};
+    const src=el('select',{class:'lnsrc',onchange:e=>{s.src=e.target.value;laneChanged();}});
+    const p=el('div',{class:'panel dev',style:'--c:'+LANE_COL[i]},
+      el('h2',{},el('span',{style:'color:'+LANE_COL[i]},'Station '+(i+1))),
+      el('div',{class:'row'},
+        el('div',{},el('div',{class:'lbl'},'Name'),el('input',{value:s.name,maxLength:16,oninput:e=>{s.name=e.target.value.slice(0,16);laneChanged();}})),
+        el('div',{},el('div',{class:'lbl'},'Side'),(()=>{const se=el('select',{onchange:e=>{s.side=e.target.value;laneChanged();}},el('option',{value:'L'},'Left'),el('option',{value:'R'},'Right'));se.value=s.side;return se;})()),
+        el('div',{},el('div',{class:'lbl'},'Distance % of lane'),el('input',{type:'number',min:1,max:99,step:1,value:s.pct,oninput:e=>{s.pct=clampN(e.target.value,1,99,s.pct);laneChanged();}}))),
+      el('div',{class:'lbl'},'Wind source'),src,
+      el('div',{class:'lnman'},
+        el('div',{class:'lbl'},'Speed ',spdV),el('input',{type:'range',min:0,max:12,step:0.1,value:s.spd,oninput:e=>{s.spd=+e.target.value;sync();laneChanged();}}),
+        el('div',{class:'lbl'},'From ',dirV),el('input',{type:'range',min:0,max:359,step:1,value:s.dir,oninput:e=>{s.dir=+e.target.value;sync();laneChanged();}}),
+        el('label',{class:'ck'},el('input',{type:'checkbox',checked:s.gust,onchange:e=>{s.gust=e.target.checked;laneChanged();}}),'Gusts (simulated)')));
+    p.src=src;p.man=p.querySelector('.lnman');sync();box.appendChild(p);
+  });
+  laneSources(true);
+}
+function laneDirWord(d){return d<23||d>=338?'head':d<68?'front-right':d<113?'from right':d<158?'rear-right':d<203?'tail':d<248?'rear-left':d<293?'from left':'front-left';}
+function laneSources(force){ // rebuild the source pickers only when the device list changes
+  const cal=DEVICES.filter(d=>d.profile==='calypso');
+  const sig=cal.map(d=>d.n+':'+d.label+':'+d.name).join('|');
+  if(!force&&sig===LV.sig)return;LV.sig=sig;
+  [...$('lanest').children].forEach((p,i)=>{
+    const s=LANE.st[i],sel=p.src;sel.textContent='';
+    sel.appendChild(el('option',{value:'manual'},'Manual (sliders below)'));
+    cal.forEach(d=>sel.appendChild(el('option',{value:String(d.n)},'Live: '+d.label+' '+d.name)));
+    if(s.src!=='manual'&&!cal.some(d=>String(d.n)===s.src))sel.appendChild(el('option',{value:s.src},'Live: device not connected'));
+    sel.value=s.src;p.man.hidden=s.src!=='manual';
+  });
+}
+function laneChanged(){
+  laneSave();LV.tSolve=0;
+  [...$('lanest').children].forEach((p,i)=>{p.man.hidden=LANE.st[i].src!=='manual';});
+}
+function laneStart(){if(LV.on)return;LV.on=true;laneSources(false);LV.raf=requestAnimationFrame(laneTick);}
+function laneStop(){LV.on=false;if(LV.raf)cancelAnimationFrame(LV.raf);LV.raf=0;}
+function laneTick(now){
+  if(!LV.on)return;
+  if(now-LV.tSolve>150||!LV.res){LV.res=laneCompute(Date.now());LV.tSolve=now;}
+  if(now-LV.tOut>300){laneOut();laneSources(false);LV.tOut=now;}
+  laneDraw(now);
+  LV.raf=requestAnimationFrame(laneTick);
+}
+function laneOut(){
+  const r=LV.res;if(!r)return;const y=r.sol.y,L=LANE.len;
+  const side=v=>(Math.abs(v)<0.0005?'':v>0?' R':' L');
+  const set=(id,v)=>{const e=$(id);if(e)e.textContent=v;};
+  set('lnDrift',(Math.abs(y)*1000).toFixed(1)+side(y));
+  set('lnMoa',(Math.abs(Math.atan(y/L))*3437.747).toFixed(2)+side(y));
+  set('lnMrad',(Math.abs(Math.atan(y/L))*1000).toFixed(2)+side(y));
+  set('lnTof',(r.sol.t*1000).toFixed(0));
+  r.share.forEach((v,i)=>{set('lnS'+i,(Math.abs(v)*1000).toFixed(1)+side(v));set('lnSn'+i,LANE.st[i].name+' share');});
+  set('lnState',r.sw.map((w,i)=>LANE.st[i].name+': '+w.state).join(' · '));
+}
+function laneDraw(now){
+  const cv=$('lanecv');const ctx=cv&&cv.getContext&&cv.getContext('2d');if(!ctx||!LV.res)return;
+  const W=Math.max(280,cv.parentElement.clientWidth||320),H=Math.round(Math.min(Math.max(W*1.35,380),Math.max(380,(window.innerHeight||800)-230)));
+  const dpr=window.devicePixelRatio||1;
+  if(cv.width!==Math.round(W*dpr)||cv.height!==Math.round(H*dpr)){cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr);cv.style.width=W+'px';cv.style.height=H+'px';}
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  const r=LV.res,L=LANE.len,top=64,bot=H-40,cx=W/2,half=Math.min(W*0.19,110),post=half+(W/2-half)/2;
+  const Y=x=>bot-x/L*(bot-top),pxm=(bot-top)/L;
+  // sideways scale: biggest offset fills ~80 % of the lane half-width (smoothed so it doesn't jump)
+  const ymax=Math.max(0.01,...r.sol.path.map(p=>Math.abs(p[1])),...r.share.map(Math.abs));
+  const want=half*0.8/ymax;LV.lat=LV.lat?LV.lat+(want-LV.lat)*0.08:want;
+  const X=y=>cx+y*LV.lat;
+  ctx.fillStyle='#11141a';ctx.fillRect(0,0,W,H);
+  // station zones on the lane
+  const xs=r.sts.map(s=>s.x);
+  if(LANE.mode==='nearest'){
+    const order=[0,1].sort((a,b)=>xs[a]-xs[b]),mid=(xs[order[0]]+xs[order[1]])/2;
+    [[0,mid,order[0]],[mid,L,order[1]]].forEach(([a,b,i])=>{ctx.fillStyle=LANE_COL[i]+'1f';ctx.fillRect(cx-half,Y(b),half*2,Y(a)-Y(b));});
+    ctx.strokeStyle='rgba(255,255,255,.25)';ctx.setLineDash([4,4]);ctx.beginPath();ctx.moveTo(cx-half,Y(mid));ctx.lineTo(cx+half,Y(mid));ctx.stroke();ctx.setLineDash([]);
+  }else{
+    const g=ctx.createLinearGradient(0,Y(Math.min(...xs)),0,Y(Math.max(...xs)));const lo=xs[0]<=xs[1]?0:1;
+    g.addColorStop(0,LANE_COL[lo]+'26');g.addColorStop(1,LANE_COL[1-lo]+'26');ctx.fillStyle=g;ctx.fillRect(cx-half,top,half*2,bot-top);
+  }
+  ctx.strokeStyle='rgba(255,255,255,.18)';ctx.strokeRect(cx-half,top,half*2,bot-top);
+  // distance ticks
+  const step=L<=60?10:L<=150?25:L<=400?50:100;ctx.fillStyle='#6f6d67';ctx.font='10px monospace';ctx.textAlign='left';
+  for(let d=0;d<=L+1e-9;d+=step){ctx.fillRect(cx-half,Y(d),5,1);if(d<L-step/2)ctx.fillText(d+' m',cx-half+7,Y(d)+3);}
+  // aim line (no wind)
+  ctx.strokeStyle='rgba(255,255,255,.2)';ctx.setLineDash([2,5]);ctx.beginPath();ctx.moveTo(cx,bot);ctx.lineTo(cx,top);ctx.stroke();ctx.setLineDash([]);
+  // wind streaks: each moves with the wind at its own spot (sideways ~1 lane width per 1.7 s at 3 m/s)
+  const field=laneField(r.sts,LANE.mode),dt=Math.min(0.05,(now-(LV.last||now))/1000);LV.last=now;
+  while(LV.parts.length<70)LV.parts.push({x:Math.random()*L,y:(Math.random()*2-1)*half});
+  const latPx=half/2.5;
+  ctx.lineWidth=1.5;
+  for(const p of LV.parts){
+    const[wx,wy]=field(p.x);p.x+=wx*dt*Math.max(1,L/60);p.y+=wy*latPx*dt;
+    if(p.x<0||p.x>L||Math.abs(p.y)>half){p.x=Math.random()*L;p.y=wy>0?-half:wy<0?half:(Math.random()*2-1)*half;}
+    const near=Math.abs(p.x-xs[0])<=Math.abs(p.x-xs[1])?0:1;
+    const sp=Math.hypot(wx,wy);if(sp<0.05)continue;
+    const ux=wy/sp,uy=-wx/sp*pxm/latPx; // screen direction of the wind at this spot
+    const n=Math.hypot(ux,uy)||1,len=4+Math.min(10,sp*2);
+    ctx.strokeStyle=LANE_COL[near]+'80';ctx.beginPath();const sx=cx+p.y,sy=Y(p.x);ctx.moveTo(sx,sy);ctx.lineTo(sx-ux/n*len,sy-uy/n*len);ctx.stroke();
+  }
+  ctx.lineWidth=1;
+  // target
+  ctx.textAlign='center';
+  [[18,'#f4f3ef'],[12,'#0a0c0f'],[6,'#f4f3ef'],[2.5,'#e07a5f']].forEach(([rr,c])=>{ctx.fillStyle=c;ctx.beginPath();ctx.arc(cx,top,rr,0,7);ctx.fill();});
+  ctx.fillStyle='#bdbab1';ctx.fillText('TARGET '+L+' m',cx,top-24);
+  // firing point
+  ctx.fillStyle='#c8a96e';ctx.fillRect(cx-9,bot+4,18,6);ctx.fillText('FIRING POINT',cx,bot+24);
+  // bullet path
+  ctx.strokeStyle='#c8a96e';ctx.lineWidth=2;ctx.beginPath();r.sol.path.forEach((p,i)=>{const sx=X(p[1]),sy=Y(p[0]);i?ctx.lineTo(sx,sy):ctx.moveTo(sx,sy);});ctx.stroke();ctx.lineWidth=1;
+  // impact
+  const iy=X(r.sol.y);ctx.strokeStyle='#e07a5f';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(iy-6,top-6);ctx.lineTo(iy+6,top+6);ctx.moveTo(iy+6,top-6);ctx.lineTo(iy-6,top+6);ctx.stroke();ctx.lineWidth=1;
+  ctx.fillStyle='#e07a5f';ctx.fillText((Math.abs(r.sol.y)*1000).toFixed(1)+' mm '+(r.sol.y>0.0005?'R':r.sol.y<-0.0005?'L':''),iy,top+32);
+  // bullet: real flight slowed down 5×, then a short pause
+  const T=r.sol.t,loop=T*5000+700,ph=(now%loop)/(T*5000);
+  if(ph<=1){const tt=ph*T,P=r.sol.path;let k=1;while(k<P.length-1&&P[k][2]<tt)k++;const a=P[k-1],b=P[k],f=b[2]>a[2]?(tt-a[2])/(b[2]-a[2]):0;
+    const bx=X(a[1]+(b[1]-a[1])*f),by=Y(a[0]+(b[0]-a[0])*f);ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(bx,by,4,0,7);ctx.fill();}
+  // stations: post beside the lane + arrow pointing where the wind blows
+  r.sw.forEach((w,i)=>{
+    const s=LANE.st[i],sy=Y(w.x),sx=s.side==='L'?cx-post:cx+post;
+    ctx.fillStyle=LANE_COL[i];ctx.beginPath();ctx.arc(sx,sy,6,0,7);ctx.fill();
+    const[wx,wy]=laneVec(w.spd,w.dir),sp=Math.hypot(wx,wy);
+    if(sp>0.05){const L2=Math.min(42,10+sp*5),ux=wy/sp,uy=-wx/sp;
+      ctx.strokeStyle=LANE_COL[i];ctx.lineWidth=2.5;ctx.beginPath();ctx.moveTo(sx-ux*L2/2,sy-uy*L2/2);const ex=sx+ux*L2/2,ey=sy+uy*L2/2;ctx.lineTo(ex,ey);
+      ctx.moveTo(ex,ey);ctx.lineTo(ex-ux*7-uy*5,ey-uy*7+ux*5);ctx.moveTo(ex,ey);ctx.lineTo(ex-ux*7+uy*5,ey-uy*7-ux*5);ctx.stroke();ctx.lineWidth=1;}
+    ctx.textAlign='center';ctx.fillStyle=LANE_COL[i];ctx.fillText(s.name.slice(0,10),sx,sy-26);
+    ctx.fillStyle='#bdbab1';ctx.fillText(w.spd.toFixed(1)+' m/s',sx,sy+32);ctx.fillText(Math.round(w.dir)+'°',sx,sy+44);
+    ctx.fillStyle=w.state.startsWith('LOST')?'#e07a5f':'#6f6d67';ctx.fillText(w.state.split(' · ')[0],sx,sy+56);
+  });
+  // legend
+  ctx.textAlign='left';ctx.fillStyle='#6f6d67';
+  const ex=LV.lat/pxm;ctx.fillText((LANE.mode==='nearest'?'nearest station':'blend between stations')+' · sideways ×'+(ex>=10?Math.round(ex):ex.toFixed(1)),8,14);
+}
+
+/* ---------- capture sessions (V1.3.0, LAB-03) ----------
+   Reverse-engineering aid: record EVERY notification (also the ones the log collapses), every
+   advert and on-demand reads from the chosen devices, with time-stamped markers for what you
+   are physically doing ("level", "pitch up ~10°"…). The summary shows, per characteristic,
+   which byte positions changed since the previous marker — the fields that follow a movement
+   stand out. Export: JSON (full) or text. Nothing is ever written to a device. */
+const CAP_PRESETS={
+  fxangle:{name:'FX angle test (LAB-03)',marks:['Level','Pitch up ~10°','Pitch down ~10°','Level','Cant left ~10°','Cant right ~10°','Level','Shot']},
+  env:{name:'Environment hunt (temp / humidity / pressure)',marks:['Indoors','Outdoors','Hand on chrono (warm)','Back indoors']},
+  rangefinder:{name:'Rangefinder (LAB-04 / LAB-05)',marks:['Power on','Ranged near target','Ranged far target','Aim up (angle)','Aim down (angle)','Unit button m↔yd','Mode button','Scan mode on','Scan mode off','Bluetooth button']},
+  free:{name:'Free (own markers only)',marks:[]}
+};
+const CAP={on:false,t0:0,name:'',preset:'fxangle',devs:[],events:[],markers:[],last:new Map(),atMark:new Map(),pollIv:null};
+function capT(){return Date.now()-CAP.t0;}
+function capKey(d,ch){return d.label+'|'+ch;}
+function capWanted(d){return CAP.on&&CAP.devs.includes(d.n);}
+function capRecord(d,kind,ch,b){
+  if(!capWanted(d))return;
+  const hex=hexOf(b);CAP.events.push({t:capT(),dev:d.label,kind,ch,hex,asc:ascOf(b)});
+  const k=capKey(d,ch),cur=CAP.last.get(k);CAP.last.set(k,{dev:d.label,ch,kind,n:(cur?cur.n:0)+1,hex,bytes:Array.from(b)});
+  if(CAP.events.length>200000)CAP.events.splice(0,CAP.events.length-200000);
+  capSummarySoon();
+}
+let capSumT=null;function capSummarySoon(){if(!capSumT)capSumT=setTimeout(()=>{capSumT=null;capRenderSummary();},250);}
+function capRefreshDevs(){
+  const box=$('capdevs');if(!box)return;box.textContent='';
+  if(!DEVICES.length){box.appendChild(el('div',{class:'note'},'Add a device on the Devices tab first.'));return;}
+  DEVICES.forEach(d=>{const cb=el('input',{type:'checkbox',checked:CAP.on?CAP.devs.includes(d.n):true,disabled:CAP.on});cb.dataset.n=d.n;
+    box.appendChild(el('label',{class:'ck'},cb,d.label+' · '+d.name+(d.connected?'':' (not connected)')));});
+}
+function capStart(){
+  if(CAP.on){capStop();return;}
+  CAP.devs=[...$('capdevs').querySelectorAll('input[type=checkbox]')].filter(c=>c.checked).map(c=>+c.dataset.n);
+  if(!CAP.devs.length){alert('Tick at least one device.');return;}
+  CAP_RANGES.length=0;
+  Object.assign(CAP,{on:true,t0:Date.now(),name:$('capname').value.trim()||CAP_PRESETS[$('cappreset').value].name,preset:$('cappreset').value,events:[],markers:[],last:new Map(),atMark:new Map()});
+  log(null,'Capture started: "'+CAP.name+'" on '+CAP.devs.map(n=>DEVICES.find(d=>d.n===n).label).join(', '),'hl');
+  if($('cappoll').checked)CAP.pollIv=setInterval(()=>capReadAll(true),2000);
+  capMark('Start');capRenderUI();
+}
+function capStop(){
+  if(CAP.pollIv){clearInterval(CAP.pollIv);CAP.pollIv=null;}
+  capMark('Stop');CAP.on=false;log(null,'Capture stopped: '+CAP.events.length+' events, '+CAP.markers.length+' markers.','hl');capRenderUI();
+}
+function capMark(text){
+  if(!CAP.on)return;text=String(text||'').trim().slice(0,60);if(!text)return;
+  CAP.markers.push({t:capT(),text});CAP.events.push({t:capT(),kind:'mark',text});
+  CAP.last.forEach((v,k)=>CAP.atMark.set(k,v.bytes.slice()));
+  log(null,'MARK "'+text+'"','hl');capRenderSummary();renderStrip();
+}
+// Byte positions of a characteristic that differ between its value at the latest marker and now.
+function capChanged(k,bytes){const base=CAP.atMark.get(k);if(!base)return null;
+  const out=[];for(let i=0;i<Math.max(base.length,bytes.length);i++)if(base[i]!==bytes[i])out.push(i);return out;}
+async function capReadAll(quiet){
+  for(const d of DEVICES.filter(x=>x.connected&&(!CAP.on||CAP.devs.includes(x.n)))){
+    for(const [u,c] of d.chars){if(!c.properties.read)continue;
+      try{const v=await enqueue(d,()=>c.readValue());const b=new Uint8Array(v.buffer.slice(v.byteOffset,v.byteOffset+v.byteLength));
+        capRecord(d,'read',shortU(u),b);if(!quiet)log(d,'READ '+shortU(u)+' = '+hexOf(b)+'  "'+ascOf(b)+'"','hl');}
+      catch(e){if(!quiet)log(d,'read '+shortU(u)+' failed: '+e.message,'er');}}
+  }
+}
+function capGattDump(){
+  const lines=[];
+  DEVICES.filter(d=>!CAP.on||CAP.devs.includes(d.n)).forEach(d=>{
+    lines.push(d.label+' "'+d.name+'" id='+d.dev.id+' profile='+d.profile+(d.connected?'':' (not connected)'));
+    const bySvc=new Map();d.chars.forEach((c,u)=>{const s=c.service.uuid.toLowerCase();if(!bySvc.has(s))bySvc.set(s,[]);bySvc.get(s).push([u,c]);});
+    d.svcs.forEach(s=>{lines.push('  SVC '+s);(bySvc.get(s)||[]).forEach(([u,c])=>{const p=c.properties,pr=['read','write','writeWithoutResponse','notify','indicate'].filter(k=>p[k]);
+      lines.push('    CHR '+u+' ['+pr.join(', ')+']'+(d.subscribed.has(u)?' subscribed':''));});});
+  });
+  const txt=lines.join('\n')||'No devices.';$('capdump').textContent=txt;
+  if(CAP.on)CAP.events.push({t:capT(),kind:'gatt',text:txt});
+  return txt;
+}
+function capRenderSummary(){
+  const tb=$('capsum');if(!tb)return;tb.textContent='';
+  const rows=[...CAP.last.entries()].sort((a,b)=>a[0]<b[0]?-1:1);
+  if(!rows.length){tb.appendChild(el('tr',null,el('td',{colSpan:4},CAP.on?'Waiting for data…':'No capture yet.')));return;}
+  rows.forEach(([k,v])=>{const ch=capChanged(k,v.bytes);
+    tb.appendChild(el('tr',null,el('td',null,v.dev+' '+v.ch+(v.kind==='read'?' (read)':v.kind==='adv'?' (adv)':'')),el('td',null,String(v.n)),
+      el('td',{class:'hexcell'},v.hex),el('td',{class:ch&&ch.length?'chg':''},ch==null?'—':ch.length?'bytes '+ch.join(','):'same')));});
+  $('capstat').textContent=CAP.on?('Recording "'+CAP.name+'" · '+CAP.events.length+' events · '+CAP.markers.length+' markers · '+Math.round(capT()/1000)+' s'):(CAP.events.length?'Stopped · '+CAP.events.length+' events · '+CAP.markers.length+' markers — export below':'');
+}
+function capRenderUI(){
+  $('capstart').textContent=CAP.on?'Stop capture':'Start capture';$('capstart').className=CAP.on?'warn':'primary';
+  ['cappreset','capname','cappoll'].forEach(id=>$(id).disabled=CAP.on);
+  const mk=$('capmarks');mk.textContent='';
+  (CAP_PRESETS[$('cappreset').value]||CAP_PRESETS.free).marks.forEach(m=>mk.appendChild(el('button',{disabled:!CAP.on,onclick:()=>capMark(m)},m)));
+  $('capmarkbtn').disabled=!CAP.on;$('caprngbtn').disabled=!CAP.on;$('capsavebtn').disabled=$('captxtbtn').disabled=!CAP.events.length;
+  capRefreshDevs();capRenderSummary();renderStrip();
+}
+/* ---------- V1.5.0 rangefinder number finder (LAB-04 / LAB-05) ----------
+   After each ranging the user types the distance (and angle) the display shows and taps "Mark range". The
+   finder searches what the devices sent between the previous range mark (at most 60 s back) and 2 s after
+   this one for that number in every common encoding: ASCII text (decimal, or ×10 / ×100 as an integer),
+   unsigned 16/24/32-bit integers little/big-endian at ×1 / ×10 / ×100 (±1 count), BCD, float32 LE/BE — in
+   the unit shown and in the other unit (m ↔ yd). The angle the same way, signed. Positions that match on
+   every ranging are the answer; one ranging alone can match by chance, so range at least two different
+   distances. Read-only: nothing is ever written to a device. */
+const CAP_RANGES=[];
+const YD=0.9144;
+function capBytes(hex){return hex?hex.split(' ').map(h=>parseInt(h,16)):[];}
+function capReadInt(b,o,w,le,signed){let x=0;for(let i=0;i<w;i++)x=x*256+b[le?o+w-1-i:o+i];if(signed&&x>=2**(8*w-1))x-=2**(8*w);return x;}
+function capBcd(b,o,w){let x=0;for(let i=0;i<w;i++){const hi=b[o+i]>>4,lo=b[o+i]&15;if(hi>9||lo>9)return null;x=x*100+hi*10+lo;}return x;}
+// Every place in one payload where `val` appears. Returns [{off,len,enc}].
+function capFindIn(b,asc,val,signed){
+  const hits=[],add=(off,len,enc,eg)=>hits.push({off,len,enc,eg});
+  // Text: digits only (a sign or unit letter next to them doesn't move the position); the encoding label is
+  // value-free so the same field matches across rangings — the text itself is kept as an example.
+  const re=/\d+(?:\.\d+)?/g,av=Math.abs(val);let m;
+  while((m=re.exec(asc))){const tok=m[0],x=parseFloat(tok),at=m.index;
+    if(Math.abs(x-av)<=0.051)add(at,tok.length,'ASCII',tok);
+    else if(!/\./.test(tok))[10,100].forEach(k=>{if(av*k>=20&&x===Math.round(av*k))add(at,tok.length,'ASCII ×'+k,tok);});}
+  for(const w of [2,3,4])for(let o=0;o+w<=b.length;o++)for(const le of [true,false]){
+    const x=capReadInt(b,o,w,le,signed);
+    for(const k of [1,10,100]){const t=val*k;if(Math.abs(t)>=20&&Math.abs(x-t)<=1)add(o,w,(signed?'int':'uint')+(8*w)+' '+(le?'LE':'BE')+' ×'+k);}
+    if(!signed){const bc=capBcd(b,o,w);if(bc!=null)for(const k of [1,10,100]){const t=Math.round(val*k);if(t>=20&&bc===t)add(o,w,'BCD ×'+k);}}
+  }
+  for(let o=0;o+4<=b.length;o++)for(const le of [true,false]){const f=new DataView(new Uint8Array(b.slice(o,o+4)).buffer).getFloat32(0,le);
+    if(isFinite(f)&&Math.abs(f)>=1&&Math.abs(f-val)<=0.06)add(o,4,'float32 '+(le?'LE':'BE'));}
+  return hits;
+}
+function capMarkRange(){
+  if(!CAP.on)return;
+  const v=parseFloat($('caprng').value),u=$('caprngu').value==='yd'?'yd':'m',a=$('capang').value===''?null:parseFloat($('capang').value);
+  if(!(v>0&&v<100000)){alert('Type the distance the rangefinder shows.');return;}
+  if(a!=null&&!(Math.abs(a)<=90)){alert('Angle must be between −90° and 90°.');return;}
+  capMark('RANGE '+v+' '+u+(a!=null?' · angle '+(a>0?'+':'')+a+'°':''));
+  CAP_RANGES.push({t:capT(),v,u,a});$('caprng').value='';$('capang').value='';
+  setTimeout(capRenderFind,2100);capRenderFind();
+}
+// Tally over all range marks: a location that carried the number every time is the answer.
+function capFindAll(){
+  const tally=new Map(),bump=(key,what,ri)=>{const e=tally.get(key)||{...what,n:0,marks:new Set()};if(!e.marks.has(ri)){e.marks.add(ri);e.n++;}tally.set(key,e);};
+  CAP_RANGES.forEach((r,ri)=>{
+    const from=Math.max(ri?CAP_RANGES[ri-1].t:0,r.t-60000),to=r.t+2000;
+    const evs=CAP.events.filter(e=>e.kind!=='mark'&&e.kind!=='gatt'&&e.hex&&e.t>from&&e.t<=to);
+    const targets=[[r.v,r.u,'distance',false],[r.u==='m'?r.v/YD:r.v*YD,r.u==='m'?'yd':'m','distance',false]];
+    if(r.a!=null)targets.push([r.a,'°','angle',true]);
+    evs.forEach(e=>{const b=capBytes(e.hex);targets.forEach(([val,unit,what,signed])=>capFindIn(b,e.asc||'',val,signed).forEach(h=>
+      bump([e.dev,e.ch,h.off,h.len,h.enc,unit,what].join('|'),{dev:e.dev,ch:e.ch,off:h.off,len:h.len,enc:h.enc,eg:h.eg,unit,what},ri)));});
+  });
+  return[...tally.values()].sort((x,y)=>y.n-x.n||(x.what<y.what?-1:1));
+}
+function capRenderFind(){
+  const box=$('capfind');if(!box)return;box.replaceChildren();
+  if(!CAP_RANGES.length)return;
+  const all=capFindAll(),N=CAP_RANGES.length,nA=CAP_RANGES.filter(r=>r.a!=null).length;
+  box.appendChild(el('div',{class:'lbl'},'Where the numbers are — '+N+' ranging'+(N>1?'s':'')+(N<2?' (range a second, different distance to confirm)':'')));
+  if(!all.length){box.appendChild(el('div',{class:'note'},'Not found in what the devices sent. Check the device is ticked and connected, then range again — or the value may be inside an encrypted or unlisted service (nRF Connect).'));return;}
+  const tb=el('tbody');
+  all.slice(0,12).forEach(h=>{const of=h.what==='angle'?nA:N,full=h.n===of;
+    tb.appendChild(el('tr',{class:full&&of>1?'hit':''},el('td',null,h.what),el('td',null,h.dev+' · '+h.ch),el('td',null,'bytes '+h.off+(h.len>1?'–'+(h.off+h.len-1):'')),el('td',null,h.enc+(h.eg?' (e.g. "'+h.eg+'")':'')+' · '+h.unit),el('td',null,h.n+' of '+of)));});
+  box.appendChild(el('div',{class:'capwrap'},el('table',{class:'capsum'},el('thead',null,el('tr',null,...['Value','Device · characteristic','Position','Encoding','Matched'].map(t=>el('th',null,t)))),tb)));
+}
+function capSession(){
+  return{app:'SEN BLE Probe',version:VERSION,session:CAP.name,preset:CAP.preset,startedAt:new Date(CAP.t0).toISOString(),userAgent:navigator.userAgent,
+    devices:DEVICES.filter(d=>CAP.devs.includes(d.n)).map(d=>({label:d.label,name:d.name,id:d.dev.id,profile:d.profile,
+      services:[...d.svcs],characteristics:[...d.chars].map(([u,c])=>({uuid:u,service:c.service.uuid.toLowerCase(),props:['read','write','writeWithoutResponse','notify','indicate'].filter(k=>c.properties[k])}))})),
+    markers:CAP.markers,ranges:CAP_RANGES.slice(),found:capFindAll().slice(0,20).map(h=>({...h,marks:undefined})),events:CAP.events};
+}
+function capText(){
+  const s=capSession(),f=t=>(t/1000).toFixed(3).padStart(9);
+  return['SEN BLE Probe V'+VERSION+' capture "'+s.session+'" '+s.startedAt,...s.devices.map(d=>d.label+' = "'+d.name+'" '+d.profile),'',
+    ...s.events.map(e=>e.kind==='mark'?f(e.t)+'  ===== '+e.text+' =====':e.kind==='gatt'?f(e.t)+'  GATT\n'+e.text:f(e.t)+'  '+e.dev+' '+e.kind+' '+e.ch+' ['+e.hex+']  "'+e.asc+'"')].join('\n');
+}
+function capDownload(json){
+  const stamp=new Date(CAP.t0||Date.now()).toISOString().replace(/[:.]/g,'-');
+  const a=el('a',{href:URL.createObjectURL(new Blob([json?JSON.stringify(capSession(),null,1):capText()],{type:json?'application/json':'text/plain'})),download:'sen-capture-'+stamp+(json?'.json':'.txt')});
+  document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);
+}
+
+/* ---------- capabilities ---------- */
+const CAPS=[];
+async function checkCaps(){
+  const bt=navigator.bluetooth,line=(k,v,ok)=>{CAPS.push(k+'='+v);$('caps').appendChild(el('div',null,k+': ',el('b',{class:ok?'ok':'bad'},v)));};
+  line('Web Bluetooth',bt?'yes':'NO',!!bt);
+  if(!bt)return;
+  let avail='unknown';try{avail=(await bt.getAvailability())?'adapter on':'adapter OFF/absent';}catch(e){}
+  line('Adapter',avail,avail==='adapter on');
+  line('getDevices() (reconnect without chooser)',typeof bt.getDevices==='function'?'yes':'no',typeof bt.getDevices==='function');
+  const wa=typeof BluetoothDevice!=='undefined'&&typeof BluetoothDevice.prototype.watchAdvertisements==='function';
+  line('watchAdvertisements() (broadcast devices)',wa?'yes':'no — enable chrome://flags "Experimental Web Platform features"',wa);
+  line('requestLEScan() (raw scan)',typeof bt.requestLEScan==='function'?'yes':'no',typeof bt.requestLEScan==='function');
+  if(typeof bt.getDevices==='function'){try{const l=await bt.getDevices();line('Previously permitted devices',String(l.length),true);}catch(e){}}
+  $('knownbtn').disabled=typeof bt.getDevices!=='function';
+}
+
+/* ---------- wiring ---------- */
+$('addbtn').addEventListener('click',addDevice);
+$('knownbtn').addEventListener('click',reconnectKnown);
+$('logFilter').addEventListener('change',rerenderLog);
+$('pausebtn').addEventListener('click',()=>{paused=!paused;$('pausebtn').textContent=paused?'Resume':'Pause';if(!paused)rerenderLog();});
+$('copybtn').addEventListener('click',()=>{navigator.clipboard&&navigator.clipboard.writeText(exportText()).then(()=>log(null,'Log copied ('+LOG.length+' lines).'));});
+$('savebtn').addEventListener('click',()=>{
+  const a=el('a',{href:URL.createObjectURL(new Blob([exportText()],{type:'text/plain'})),download:'sen-ble-probe-'+new Date().toISOString().replace(/[:.]/g,'-')+'.txt'});
+  document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);
+});
+$('clearbtn').addEventListener('click',()=>{LOG.length=0;$('log').textContent='';});
+setInterval(()=>DEVICES.forEach(d=>{if(d.profile==='calypso')calTag(d);}),1000);
+$('mainbtn').addEventListener('click',loadMain);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')loadMain();});
+loadMain();
+TABS.forEach(t=>$('tb-'+t).addEventListener('click',()=>showTab(t)));
+for(const k in CAP_PRESETS)$('cappreset').appendChild(el('option',{value:k},CAP_PRESETS[k].name));
+$('cappreset').addEventListener('change',capRenderUI);
+$('capstart').addEventListener('click',capStart);
+$('capmarkbtn').addEventListener('click',()=>{capMark($('capmarktxt').value);$('capmarktxt').value='';});
+$('caprngbtn').addEventListener('click',capMarkRange);
+$('capmarktxt').addEventListener('keydown',e=>{if(e.key==='Enter'){capMark($('capmarktxt').value);$('capmarktxt').value='';}});
+$('capreadbtn').addEventListener('click',()=>capReadAll(false));
+$('capdumpbtn').addEventListener('click',capGattDump);
+$('capsavebtn').addEventListener('click',()=>capDownload(true));
+$('captxtbtn').addEventListener('click',()=>capDownload(false));
+capRenderUI();
+$('lnLen').value=LANE.len;$('lnMode').value=LANE.mode;$('lnMv').value=LANE.mv;$('lnBc').value=LANE.bc;
+$('lnLen').addEventListener('input',e=>{LANE.len=clampN(e.target.value,10,1000,LANE.len);LV.parts.length=0;laneChanged();});
+$('lnMode').addEventListener('change',e=>{LANE.mode=e.target.value==='blend'?'blend':'nearest';laneChanged();});
+$('lnMv').addEventListener('input',e=>{LANE.mv=clampN(e.target.value,50,400,LANE.mv);laneChanged();});
+$('lnBc').addEventListener('input',e=>{LANE.bc=clampN(e.target.value,0.02,0.5,LANE.bc);laneChanged();});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')laneStop();else if(!$('tab-lane').hidden)laneStart();});
+laneUI();
+{let t='devices';try{t=localStorage.getItem('sen_lab_tab')||t;}catch(e){}showTab(t);}
+applyLabLayout();let _lyT=null;window.addEventListener('resize',()=>{clearTimeout(_lyT);_lyT=setTimeout(applyLabLayout,120);});
+try{const x=localStorage.getItem('sen_lab_extrasvc');if(x&&!$('extraSvc').value)$('extraSvc').value=x.slice(0,2000);}catch(e){}
+checkCaps().then(()=>log(null,'SEN BLE Probe V'+VERSION+' ready. '+CAPS.join(' · ')));
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(e=>log(null,'Service worker not registered: '+e.message,'er'));
+</script>
+</body>
+</html>
