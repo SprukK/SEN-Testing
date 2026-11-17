@@ -1,6 +1,6 @@
 # SEN Lab (BLE Probe) tests
 
-Run all nine before every release. Install the test dependencies **outside** the repo so no `node_modules` gets committed:
+Run all ten before every release. Install the test dependencies **outside** the repo so no `node_modules` gets committed:
 
 ```bash
 npm install jsdom fake-indexeddb --prefix /tmp/jsdom
@@ -16,6 +16,7 @@ npm install jsdom fake-indexeddb --prefix /tmp/jsdom
 | `foldtest.js` | Fold layout (V1.6.0): outer screen unchanged; unfolded Devices → live log in the second pane, Capture → finder + byte-change table + GATT dump + log, Lane / Data → full width with ◧ Log, Log → full width in its tab; switch per tab remembered; capture results back in their exact place; folding mid-capture keeps the device connected and recording; desktop two panes; landscape phone single column; garbage stored choices → defaults; no HTML sinks | PASS 25 / FAIL 0 |
 | `matchtest.js` | Profile matching (V1.6.1): the Calypso profile by name (`WDOT-…`) only. A device with the same ISSC FFF1/FFF2 layout and another name (Vector Paragon SCRF-S24) or no name → generic profile and ZERO writes with auto-initialise ticked. A real Calypso still auto-handshakes with its own `:DU`. Choosing Calypso by hand still sends the handshake. The Garmin service is named in the chooser with the wide net on and off | PASS 11 / FAIL 0 |
 | `profiletest.js` | Device profiles (V1.7.0): Element Titan/Helix (the five confirmed rangings, yards column, junk frame), AEA BC1500 (split text lines, yards, JSON `#point#`, distance without angle, broken JSON), LabRadar LX. LabRadar: the frame builder matches the real app frames byte for byte; the simulated unit checks every CRC with an independently written CRC and accepts only the real key; the start sequence order; key accepted / rejected; armed event; the three real shot frames cut into 20-byte notifications match the CSV (V0, V@25 m, 25.30 gr); a bad-CRC frame is dropped; the poll stops on disconnect. Zero writes to rangefinders, zero to the LabRadar with auto-init off. No HTML sinks | PASS 30 / FAIL 0 |
+| `benchmodtest.js` | Module_Bench V1.0.0 (BENCH-09 flight view): physics core still verbatim in Main; Main anchors (Berger 1.181, ρ 1.1516, BC penalty); module physics vs independent Python (I_x, spin decay, Reynolds, helix, epicycle); real-DOM A/B slots, range scrubber, tail length/angle and assumed BC (Lab namespace), gaps, garbage settings, Main data read-only; real Main snapshot | PASS 44 / FAIL 0 |
 | `maindatatest.js` | CORE-09 (V1.2.0): the real Lab page and the real Main calculator in two jsdom windows sharing one IndexedDB — no Main data → message and no database created; Main saves → identical counts and active session; Main's data unchanged and no upgrade blocked; chrono average vs profile MV; re-read on return; localStorage fallback; newer schema refused; unreadable data reported | PASS 13 / FAIL 0 |
 
 ```bash
@@ -29,6 +30,7 @@ NODE_PATH=/tmp/jsdom/node_modules node foldtest.js ../index.html
 NODE_PATH=/tmp/jsdom/node_modules node matchtest.js ../index.html
 NODE_PATH=/tmp/jsdom/node_modules node profiletest.js ../index.html
 # needs a checkout of SprukK/SEN-Balistic-Calculator next to this repo
+NODE_PATH=/tmp/jsdom/node_modules node benchmodtest.js ../Module_Bench.html ../../sen-balistic-calculator/index.html
 NODE_PATH=/tmp/jsdom/node_modules node maindatatest.js ../index.html ../../sen-balistic-calculator/index.html
 ```
 

@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0a0c0f">
+<title>SEN Module Bench V1.0.0</title>
+<link rel="icon" href="probe-icon-192.png">
+<style>
+:root{--bg:#0a0c0f;--bg2:#11141a;--bg3:#171b22;--border:rgba(255,255,255,.1);--text:#f4f3ef;--text2:#bdbab1;--text3:#6f6d67;--accent:#7eb8c4;--gold:#c8a96e;--green:#7ab87a;--warn:#e07a5f;--red:#d4574e;--violet:#d9b3ff;--mono:'IBM Plex Mono','SF Mono',Menlo,Consolas,monospace}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--mono);font-size:13px;line-height:1.5;max-width:1100px;margin:0 auto;padding:14px 14px calc(40px + env(safe-area-inset-bottom))}
+h1{font-size:17px;font-weight:700}
+.sub{font-size:11px;color:var(--text3);margin:2px 0 14px}
+.panel{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:12px;min-width:0}
+.panel h2{font-size:11px;color:var(--text3);letter-spacing:.12em;text-transform:uppercase;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.panel h2 .slotname{color:var(--c);font-size:13px;letter-spacing:0;text-transform:none}
+button{font-family:var(--mono);cursor:pointer;font-size:12px;padding:10px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:7px;color:var(--text);min-height:44px}
+input,select{font-family:var(--mono);font-size:16px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:8px;width:100%;min-height:44px;min-width:0}
+input[type=range]{padding:0;min-height:36px;accent-color:var(--accent)}
+label.ck{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text2);cursor:pointer;min-height:44px}
+label.ck input{width:auto;min-height:auto;flex:0 0 auto}
+.lbl{font-size:11px;color:var(--text3);margin:8px 0 3px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}
+.slots{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr));gap:12px}
+.scs{display:grid;grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:6px;margin-top:8px}
+.sc{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:6px 8px;min-width:0}
+.sc .l{font-size:11px;color:var(--text3)}
+.sc .v{font-size:15px;font-weight:700;color:var(--c,var(--accent));overflow-wrap:anywhere}
+.sc .u{font-size:11px;color:var(--text2)}
+.tag{display:inline-block;padding:1px 6px;border-radius:4px;font-size:11px;background:rgba(200,169,110,.15);color:var(--gold)}
+.tag.ill{background:rgba(217,179,255,.12);color:var(--violet)}
+.tag.ok{background:rgba(122,184,122,.15);color:var(--green)}
+.note{font-size:12px;color:var(--text2);line-height:1.6;margin-top:8px}
+.warn{color:var(--warn)}
+ul.gaps{list-style:none;font-size:12px;line-height:1.6}
+ul.gaps li{padding-left:14px;text-indent:-14px}
+ul.gaps li::before{content:'▸ ';color:var(--gold)}
+.view{position:relative;margin-top:10px}
+canvas.flow{width:100%;height:230px;display:block;background:#06080b;border:1px solid var(--border);border-radius:8px}
+canvas.yaw{position:absolute;right:6px;top:6px;width:96px;height:96px;background:rgba(10,12,15,.85);border:1px solid var(--border);border-radius:8px}
+svg.chart{width:100%;height:auto;display:block}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:11px;color:var(--text2);margin-top:6px}
+.sw{display:inline-block;width:14px;height:8px;border-radius:2px;margin-right:4px;vertical-align:middle}
+.hide{display:none}
+</style>
+</head>
+<body>
+<h1>SEN Module Bench · Flight view</h1>
+<div class="sub">V1.0.0 · Lab module for BENCH-09 · reads the calculator's data read-only · nothing here feeds dope</div>
+
+<div class="panel"><h2>Open data gaps</h2><ul class="gaps" id="gaps"></ul></div>
+
+<div class="panel"><h2>Air, range and display</h2>
+  <div class="note" id="mainstatus">Reading the calculator's data…</div>
+  <div class="grid" style="margin-top:8px">
+    <div><div class="lbl">Temperature °C</div><input id="airT" type="number" step="0.1" inputmode="decimal"></div>
+    <div><div class="lbl">Station pressure hPa</div><input id="airP" type="number" step="0.1" inputmode="decimal"></div>
+    <div><div class="lbl">Humidity %</div><input id="airH" type="number" step="1" inputmode="decimal"></div>
+    <div><div class="lbl">Range to (m)</div><input id="maxR" type="number" step="10" inputmode="decimal"></div>
+    <div><div class="lbl">Roll damping C_lp (assumed)</div><input id="clp" type="number" step="0.001" inputmode="decimal"></div>
+    <div><div class="lbl">Yaw and chart based on</div><select id="model"><option value="miller">Miller</option><option value="mcgyro">McGyro</option></select></div>
+  </div>
+  <div class="note" id="airsrc"></div>
+  <div class="grid">
+    <label class="ck"><input type="checkbox" id="cmp"> Compare B</label>
+    <label class="ck"><input type="checkbox" id="exag"> Exaggerate yaw ×5</label>
+    <button id="pause">Pause</button>
+  </div>
+</div>
+
+<div class="panel"><h2>Range <span id="rangeOut" style="color:var(--text);font-size:13px;letter-spacing:0"></span></h2>
+  <input id="range" type="range" min="0" max="300" step="5" value="0" aria-label="Range along the flight">
+</div>
+
+<div class="slots" id="slots"></div>
+
+<div class="panel"><h2>Stability along the range</h2>
+  <div id="chartbox"></div>
+  <div class="legend" id="legend"></div>
+  <div class="note">Bands: top edge = no spin decay, bottom edge = spin decay with the assumed C_lp. Sg rises downrange because velocity falls faster than spin. <span class="tag">EST</span> Downrange Sg is not yet anchored to an external reference (§20A) — the muzzle values are the verified ones.</div>
+</div>
+
+<div class="panel"><h2>What is calculated and what is drawn</h2>
+  <div class="note"><span class="tag ok">verified</span> velocity, Mach and time of flight (the calculator's RK4 engine), Miller Sg at the muzzle (= Berger), McGyro Sg at the muzzle, BC penalty, mass from geometry — copied unchanged from Main V2.16.3.</div>
+  <div class="note"><span class="tag">EST</span> spin rate downrange (roll damping C_lp assumed), Sg downrange, Reynolds number (Sutherland viscosity), epicycle frequency ratio (linear theory, McCoy).</div>
+  <div class="note"><span class="tag ill">illustrative</span> streamlines, boundary layer, transition at the engraved band, separation point, wake size, yaw size (initial disturbance assumed; no damping until dynamic stability is built), engraving count. Display spin is slowed down; the real rate is in the tiles.</div>
+</div>
+
+<script>
+/* ═══ Physics core — copied UNCHANGED from Main V2.16.3 (index.html). tests/benchmodtest.js checks that
+   every line of this block still appears verbatim in Main. Do not edit here; re-copy from Main instead. ═══ */
+const G=9.80665,GR2KG=0.00006479891,LB2KGM2=703.07;
+const G7T=[[0,0.1198],[0.05,0.1197],[0.1,0.1196],[0.15,0.1194],[0.2,0.1193],[0.25,0.1194],[0.3,0.1194],[0.35,0.1194],[0.4,0.1193],[0.45,0.1193],[0.5,0.1194],[0.55,0.1193],[0.6,0.1194],[0.65,0.1197],[0.7,0.1202],[0.725,0.1207],[0.75,0.1215],[0.775,0.1226],[0.8,0.1242],[0.825,0.1266],[0.85,0.1306],[0.875,0.1368],[0.9,0.1464],[0.925,0.166],[0.95,0.2054],[0.975,0.2993],[1,0.3803],[1.025,0.4015],[1.05,0.4043],[1.075,0.4034],[1.1,0.4014],[1.125,0.3987],[1.15,0.3955],[1.2,0.3884],[1.25,0.381],[1.3,0.3732],[1.35,0.3657],[1.4,0.358],[1.5,0.344],[1.55,0.3376],[1.6,0.3315],[1.65,0.326],[1.7,0.3209],[1.75,0.316],[1.8,0.3117],[1.85,0.3078],[1.9,0.3042],[1.95,0.301],[2,0.298],[2.05,0.2951],[2.1,0.2922],[2.15,0.2892],[2.2,0.2864],[2.25,0.2835],[2.3,0.2807],[2.35,0.2779],[2.4,0.2752],[2.45,0.2725],[2.5,0.2697],[2.55,0.267],[2.6,0.2643],[2.65,0.2615],[2.7,0.2588],[2.75,0.2561],[2.8,0.2533],[2.85,0.2506],[2.9,0.2479],[2.95,0.2451],[3,0.2424],[3.1,0.2368],[3.2,0.2313],[3.3,0.2258],[3.4,0.2205],[3.5,0.2154],[3.6,0.2106],[3.7,0.206],[3.8,0.2017],[3.9,0.1975],[4,0.1935],[4.2,0.1861],[4.4,0.1793],[4.6,0.173],[4.8,0.1672],[5,0.1618]];
+const G1T=[[0,0.2629],[0.05,0.2558],[0.1,0.2487],[0.15,0.2413],[0.2,0.2344],[0.25,0.2278],[0.3,0.2214],[0.35,0.2155],[0.4,0.2104],[0.45,0.2061],[0.5,0.2032],[0.55,0.202],[0.6,0.2034],[0.7,0.2165],[0.725,0.223],[0.75,0.2313],[0.775,0.2417],[0.8,0.2546],[0.825,0.2706],[0.85,0.2901],[0.875,0.3136],[0.9,0.3415],[0.925,0.3734],[0.95,0.4084],[0.975,0.4448],[1,0.4805],[1.025,0.5136],[1.05,0.5427],[1.075,0.5677],[1.1,0.5883],[1.125,0.6053],[1.15,0.6191],[1.2,0.6393],[1.25,0.6518],[1.3,0.6589],[1.35,0.6621],[1.4,0.6625],[1.45,0.6607],[1.5,0.6573],[1.55,0.6528],[1.6,0.6474],[1.65,0.6413],[1.7,0.6347],[1.75,0.628],[1.8,0.621],[1.85,0.6141],[1.9,0.6072],[1.95,0.6003],[2,0.5934],[2.05,0.5867],[2.1,0.5804],[2.15,0.5743],[2.2,0.5685],[2.25,0.563],[2.3,0.5577],[2.35,0.5527],[2.4,0.5481],[2.45,0.5438],[2.5,0.5397],[2.6,0.5325],[2.7,0.5264],[2.8,0.5211],[2.9,0.5168],[3,0.5133],[3.1,0.5105],[3.2,0.5084],[3.3,0.5067],[3.4,0.5054],[3.5,0.504],[3.6,0.503],[3.7,0.5022],[3.8,0.5016],[3.9,0.501],[4,0.5006],[4.2,0.4998],[4.4,0.4995],[4.6,0.4992],[4.8,0.499],[5,0.4988]];
+function interp(T,x){
+  if(x<=T[0][0])return T[0][1];if(x>=T[T.length-1][0])return T[T.length-1][1];
+  for(let i=0;i<T.length-1;i++)if(x>=T[i][0]&&x<=T[i+1][0]){const t=(x-T[i][0])/(T[i+1][0]-T[i][0]);return T[i][1]+t*(T[i+1][1]-T[i][1]);}return T[T.length-1][1];
+}
+function stationPres(qnh,alt_m){return qnh*Math.pow(1-2.25577e-5*alt_m,5.25588);}
+const wxPres=w=>w?(w.presType==='sea'?stationPres(w.pres,+w.alt||0):w.pres):undefined;
+function airDensity(tC,hPa,rh){const TK=tC+273.15,P=hPa*100,es=6.1078*Math.pow(10,7.5*tC/(237.3+tC))*100,e=(rh/100)*es;return(P-e)/(287.058*TK)+e/(461.495*TK);}
+function sos(tC){return Math.sqrt(1.4*287.058*(tC+273.15));}
+function calcSD(mass_gr,d_mm){const d_in=d_mm/25.4;return mass_gr/(7000*d_in*d_in);}
+function calcSg(mass_gr,d_mm,oal_mm,twist_mm,mv_ms,C,tC,hPa){
+  const d_in=d_mm/25.4,oal_in=oal_mm/25.4,tw_in=twist_mm/25.4,L=oal_in/d_in,mv_fps=mv_ms/0.3048,TF=tC*9/5+32,P_inHg=hPa/33.8639;
+  return C*mass_gr/(tw_in*tw_in*d_in*d_in*d_in*L*(1+L*L))*Math.pow(mv_fps/2800,1/3)*(TF+460)/519*29.92/P_inHg;
+}
+function rk4traj(mv,bc_g7,mass_gr,zero_m,max_m,sight_m,rho,aS,stepOut,drag,bc_g1,bands,zeroEnv,flight){
+  /* FIX-10 two-pass zero (§11I: BC is density-independent; ρ belongs in the drag term only).
+     Pass 1 solves the launch angle in the ZERO atmosphere (zeroEnv: {rho, aS, bc7, bc1} —
+     the conditions and Sg-penalised BC in effect when the rifle was sighted in).
+     Pass 2 integrates the output with that FIXED angle in the CURRENT atmosphere.
+     drop(zero) ≠ 0 exactly when the atmospheres differ — that nonzero value IS the
+     physical zero shift. zeroEnv omitted → both passes share the current env (single-pass,
+     bit-identical to the verified V1.9.x behaviour). */
+  const DT=drag==='g7'?G7T:G1T;
+  const mkEnv=(rhoX,aSX,b7,b1)=>{
+    const bcFix=(drag==='g7'?b7:b1)*LB2KGM2;
+    const bcSiAt=bands&&bands.length?(v=>(bandBC(bands,v)||(drag==='g7'?b7:b1))*LB2KGM2):(()=>bcFix);
+    return{rho:rhoX,aS:aSX,bcSiAt};
+  };
+  /* V1.31.0 — shot angle and head/tailwind inside the integration (flight = {look°, head, zHead};
+     head = wind along the line of fire, m/s, + = tailwind). The state is integrated in the line-of-sight
+     frame: x along the LOS (slant range), y perpendicular to it, so drop is measured from the LOS
+     directly. Gravity in that frame = (−g·sin look, −g·cos look); a horizontal wind h becomes
+     (h·cos look, −h·sin look) and drag acts on the velocity relative to the air. The zero pass stays
+     level (the rifle was sighted in on the level) with the zero session's head/tailwind; the flight pass
+     uses the shot's angle and wind. flight omitted → gravity (0, −g), no wind: bit-identical to before.
+     Verified against py-ballisticcalc 3.1.1 (look_angle, Wind) — runtests.js. */
+  const fl=flight||{},lk=(fl.look||0)*Math.PI/180,hdF=typeof fl.head==='function'?fl.head:null,hd=hdF?0:(fl.head||0);
+  const cur={...mkEnv(rho,aS,bc_g7,bc_g1),gx:lk?-G*Math.sin(lk):0,gy:lk?-G*Math.cos(lk):-G,wx:lk?hd*Math.cos(lk):hd,wy:lk?-hd*Math.sin(lk):0};
+  /* V2.1.0 (CORE-17) — head/tailwind that changes along the flight: flight.head may be a function of the
+     horizontal distance along the line of fire (x·cos look), evaluated at every RK4 stage position. */
+  if(hdF)cur.windAt=x=>{const h=hdF(lk?x*Math.cos(lk):x);return[lk?h*Math.cos(lk):h,lk?-h*Math.sin(lk):0];};
+  const zen={...(zeroEnv?mkEnv(zeroEnv.rho,zeroEnv.aS,zeroEnv.bc7??bc_g7,zeroEnv.bc1??bc_g1):cur),gx:0,gy:-G,wx:fl.zHead||0,wy:0,windAt:null}; // zero pass: level, zero session's wind only
+  /* V1.24.2 — drag deceleration = (π/8)·ρ·v²·Cd / BC, i.e. (π/4)·ρv²Cd / (2·BC_si). The small-arms BC
+     (§9H: m/(i·d²), no π/4) omits the reference area's π/4, so the drag term must restore it:
+     F = ½ρv²·Cd·(πd²/4) → a = (π/8)ρv²Cd·d²/m. Without it every trajectory had 4/π = 27.3% too much
+     drag. Verified: first principles · py-ballisticcalc (constant 2.08551e-4 = (π/8)·ρ₀/144, reproduced to
+     0.01 m/s) · owner's Element Ballistics table (Queen G1 0.245, 285 m/s) within 0.2% to 1000 m. */
+  function D(x,vx,vy,env){const w=env.windAt?env.windAt(x):null,rx=vx-(w?w[0]:env.wx),ry=vy-(w?w[1]:env.wy),v=Math.sqrt(rx*rx+ry*ry),m=v/env.aS,cd=interp(DT,m),dec=Math.PI/4*(env.rho*v*v*cd)/(2*env.bcSiAt(v));return[-(dec/v)*rx+env.gx,-(dec/v)*ry+env.gy];}
+  function step(x,y,vx,vy,h,env){
+    // stage positions x, x+h/2·v1, x+h/2·v2, x+h·v3 (only used by a wind field)
+    const[k1ax,k1ay]=D(x,vx,vy,env);const vx2=vx+h*k1ax/2;const[k2ax,k2ay]=D(x+h/2*vx,vx2,vy+h*k1ay/2,env);const vx3=vx+h*k2ax/2;const[k3ax,k3ay]=D(x+h/2*vx2,vx3,vy+h*k2ay/2,env);const[k4ax,k4ay]=D(x+h*vx3,vx+h*k3ax,vy+h*k3ay,env);
+    // V1.29.1: position advances by the RK4 average of the four stage velocities (skill §7), not the
+    // start-of-step velocity — that Euler update made TOF 0.016 % short and lag-rule drift 0.5 % low.
+    // Verified vs py-ballisticcalc 3.1.1: TOF to 3e-6 s, drop to 0.1 mm, drift 37.22 mm (3 m/s, 100 m).
+    const vxs=vx+2*(vx+h*k1ax/2)+2*(vx+h*k2ax/2)+(vx+h*k3ax),vys=vy+2*(vy+h*k1ay/2)+2*(vy+h*k2ay/2)+(vy+h*k3ay);
+    return[x+h*vxs/6,y+h*vys/6,vx+h*(k1ax+2*k2ax+2*k3ax+k4ax)/6,vy+h*(k1ay+2*k2ay+2*k3ay+k4ay)/6];
+  }
+  const dt=0.002;
+  let lo=-0.1,hi=0.1;
+  // PASS 1 — zero-atmosphere bisection. Step cap: with an extreme-drag input the projectile
+  // can stall before zero_m and x never advances — without a cap this loop never exits
+  // (tab hang). 1e5 steps = 200 s of flight, far beyond any legitimate zero range.
+  // L1 (V1.13.2): dense output — the bisection target is y at EXACTLY zero_m (linear within
+  // the final ~0.5 m integration step), not at the first step past it. Keeps drop(zero)=0
+  // by construction once the output pass interpolates the same way.
+  function finalY(a){let x=0,y=-sight_m,vx=mv*Math.cos(a),vy=mv*Math.sin(a),n=0,px=0,py=y;
+    while(x<zero_m&&n++<1e5){px=x;py=y;[x,y,vx,vy]=step(x,y,vx,vy,dt,zen);}
+    return x>px&&x>zero_m?py+(zero_m-px)/(x-px)*(y-py):y;}
+  for(let i=0;i<60;i++){const m=(lo+hi)/2;finalY(m)>0?hi=m:lo=m;}
+  const za=(lo+hi)/2;
+  // V2.12.0: time of flight to the zero range in the zero pass (zero air) — spin drift is referenced to the zero
+  let zeroTof=null;{let x=0,y=-sight_m,vx=mv*Math.cos(za),vy=mv*Math.sin(za),n=0,px=0;
+    while(x<zero_m&&n++<1e5){px=x;[x,y,vx,vy]=step(x,y,vx,vy,dt,zen);}
+    if(x>=zero_m)zeroTof=(n-1+(x>px?(zero_m-px)/(x-px):1))*dt;}
+  // PASS 2 — current-atmosphere integration with the fixed zero angle.
+  // V2.10.0 (CALC-07): flight.mv launches this pass at another MV with the same zero angle (the shot-to-shot
+  // MV spread of a real rifle). Omitted → mv: bit-identical to before.
+  const mvF=fl.mv>0?fl.mv:mv;
+  let x=0,y=-sight_m,vx=mvF*Math.cos(za),vy=mvF*Math.sin(za),t=0,next=0,out=[];
+  // FIX-6: the bail-out guard exists to abort absurd inputs, not to cap legitimate drop.
+  // Subsonic ELR drops exceed 80 m well before 1 km — scale the guard with requested range
+  // (30% of max_m, floor 80 m) so 800 m+ trajectories complete instead of reporting OOR.
+  const yGuard=-Math.max(80,0.3*max_m);
+  while(x<=max_m+dt&&y>yGuard){
+    const px=x,py=y,pvx=vx,pvy=vy,pt=t;
+    [x,y,vx,vy]=step(x,y,vx,vy,dt,cur);t+=dt;
+    // L1 (V1.13.2): dense output. Points were recorded at the first dt-step PAST each output
+    // range (≈0.5 m overshoot at airgun velocities) with the label rounded — up to ~0.03 mrad
+    // of silent dial error at every range in every module. Now the state is linearly
+    // interpolated within the bracketing integration step to EXACTLY the output range; labels
+    // are exact, no rounding. Sub-µrad residual (state is near-linear over 0.5 m).
+    // V1.9.0 CORRECTION (§20A verified): drop is height vs the HORIZONTAL LINE OF SIGHT (y·1000).
+    // With matching atmospheres the bullet crosses y=0 at zero range by bisection (finalY
+    // interpolates to the same exact zero_m), so drop(zero)=0 by construction; with mismatched
+    // atmospheres drop(zero) is the physical zero shift (FIX-10). dial mrad = −drop/range.
+    while(x>=next&&next<=max_m+1e-9){
+      const f=x>px?(next-px)/(x-px):0;
+      const iy=py+f*(y-py),ivx=pvx+f*(vx-pvx),ivy=pvy+f*(vy-pvy),it=pt+f*dt;
+      const v=Math.sqrt(ivx*ivx+ivy*ivy),mach=v/cur.aS,E=0.5*mass_gr*GR2KG*v*v;
+      out.push({range:next,drop:iy*1000,v,mach,E,tof:it,lag:it-next/mvF,vx:ivx});
+      next+=stepOut;
+    }
+  }
+  out.za=za;out.sight=sight_m; // V1.32.0: bore-line geometry for cant
+  out.zeroTof=zeroTof;         // V2.12.0
+  // Same trajectory for another shot angle / head-tailwind (solveShot), cached per rounded key.
+  if(!flight){const A=[mv,bc_g7,mass_gr,zero_m,max_m,sight_m,rho,aS,stepOut,drag,bc_g1,bands,zeroEnv],cache=new Map();
+    // head may be a number, or a function of distance (wind field) passed with headKey identifying it.
+    out.recalc=(look,head,zHead,headKey)=>{const hf=typeof head==='function';const k=[look,hf?0:head,zHead].map(x=>(+x||0).toFixed(3)).join('|')+(hf?'|f:'+headKey:'');
+      if(!cache.has(k)){if(cache.size>=24)cache.delete(cache.keys().next().value);cache.set(k,rk4traj(...A,{look:+look||0,head:hf?head:(+head||0),zHead:+zHead||0}));}
+      return cache.get(k);};}
+  return out;
+}
+function millerC(d_mm,oal_mm){
+  if(!(d_mm>0)||!(oal_mm>0))return{c:0,est:false,valid:false,why:'size'};
+  if(oal_mm/d_mm<2.0)return{c:0,est:false,valid:false,why:'ld'};
+  return{c:30*Math.pow(d_mm/25.4,2),est:false,valid:true,why:'miller'};
+}
+function mcgyro(L,Ln,rtr,db,dm,rho,twistCal,M){
+  if(!(L>0)||!(Ln>=0)||!(rho>0)||!(twistCal>0)||!(M>0)||dm>=1||dm<0)return null;
+  const S1=Math.sqrt(1-dm),S2=1-db*db;
+  const G1=M<=0.95?20.082+3.726*(M/Math.sqrt(1-M*M)):M>=1.1?35.079-24.066*(Math.sqrt(M*M-1)/M):71.73001-42.433*M;
+  const A1=G1*S2;let A,B;
+  if(M<1){const B1=Math.sqrt(1-M*M);B=.82112+.36971*B1;A=34.779+(24.091+(8.977-12.804*rtr+8.38*rtr*rtr)*Ln)*S1*B1-A1;}
+  else{const B1=Math.sqrt(M*M-1)/M;B=1.0528+.23379*B1-.004884*(M-1);A=58.873+(8.115+(14.15-15.348*rtr+7.216*rtr*rtr)*Ln)*S1*B1*B1-A1;}
+  if(!(A>0))return null;
+  const n15=A*Math.sqrt(rho)/Math.pow(L,B);
+  return{n15,sg:1.5*Math.pow(n15/twistCal,2)};
+}
+const LEAD_GCC=11.34;
+const MCG_RHO_STD=airDensity(15,1013.25,0);
+function mcgyroAir(sh,twistCal,mv,tC,hPa,rh){
+  const M=mv/sos(tC),r=mcgyro(sh.L,sh.Ln,sh.rtr,sh.db,sh.dm,sh.rho,twistCal,M);if(!r)return null;
+  const k=MCG_RHO_STD/airDensity(tC,hPa,rh||0);
+  return{sg:r.sg*k,n15:r.n15*Math.sqrt(k),M};
+}
+function mcgyroShape(p){
+  if(!p||!(p.diam>0)||!(p.oal>0)||!(p.noseL>0)||p.rtr==null||p.meplat==null||!(p.baseD>0))return null;
+  const d=p.diam;return{L:p.oal/d,Ln:p.noseL/d,rtr:p.rtr,db:p.baseD/d,dm:p.meplat/d,rho:p.dens>0?p.dens:LEAD_GCC};
+}
+function bandBC(bands,v){
+  if(!bands||!bands.length)return null;
+  for(const b of bands){if(v<=b.vHi&&v>b.vLo)return b.bc;}
+  return v>bands[0].vHi?bands[0].bc:bands[bands.length-1].bc; // clamp outside measured range
+}
+const bcIsTrued=(p,drag)=>!!(p&&p.bcTrued&&String(p.bcTrued).includes('·'+drag+'·'));
+function bcEffSg(bc,sg){return sg>=1.5?bc:bc*Math.pow(sg/1.5,0.4);}  // §4D under-stabilisation penalty
+const SB_GCC=6.697;                       // antimony, g/cm³
+function alloyDensity(g){
+  if(g.alloy==='custom')return g.dens>0?g.dens:null;
+  if(g.alloy==='sb'){const w=(g.sb||0)/100;return 1/((1-w)/LEAD_GCC+w/SB_GCC);}   // ideal mixing by mass
+  return LEAD_GCC;
+}
+function cavR(shape,a,h,t){
+  if(!(a>0)||!(h>0)||t<0||t>h)return 0;
+  if(shape==='cone')return a*(1-t/h);
+  if(shape==='dish'){const R=(a*a+h*h)/(2*h),z=R-h+t;return Math.sqrt(Math.max(0,R*R-z*z));}
+  if(shape==='ball'){const u=t-(h-a);return u<=0?a:Math.sqrt(Math.max(0,a*a-u*u));}   // sphere centre at depth h − a
+  return a;
+}
+function benchGeom(g){
+  const n=v=>v>0?v:0,rb=n(g.diam)/2,Lt=n(g.btL),Lb=n(g.bearL),Ln=n(g.noseL);
+  const rm=Ln>0?n(g.meplat)/2:rb,rbase=Lt>0?n(g.baseD)/2:rb,oal=Lt+Lb+Ln,rtr=g.rtr==null?1:g.rtr;
+  const err=t=>({err:t});
+  if(!(rb>0))return err('Enter the body diameter.');
+  if(!(oal>0))return err('Enter the bearing and/or nose length.');
+  if(Ln>0&&rm>=rb)return err('The meplat must be smaller than the body diameter.');
+  if(Lt>0&&!(rbase>0))return err('Enter the base Ø for the boat tail.');
+  if(Lt>0&&rbase>rb)return err('The base Ø can\'t be larger than the body Ø.');
+  let nose;
+  if(Ln>0){
+    const d=rb-rm,RT=(Ln*Ln+d*d)/(2*d);
+    if(rtr<1e-6)nose={kind:'cone',r:s=>rb-d*s/Ln};
+    else{
+      const R=RT/rtr,c=Math.hypot(Ln,d),h=Math.sqrt(Math.max(0,R*R-c*c/4)),xc=Ln/2-h*d/c,yc=(rb+rm)/2-h*Ln/c;
+      nose={kind:rtr>=1-1e-9?'tangent':'secant',R,xc,yc,r:s=>yc+Math.sqrt(Math.max(0,R*R-(s-xc)*(s-xc)))};
+    }
+  }
+  const x1=Lt,x2=Lt+Lb;
+  const r=x=>x<x1?rbase+(rb-rbase)*x/Lt:x<=x2||!nose?rb:nose.r(Math.min(Ln,x-x2));
+  const hpA=n(g.hpD)/2,hpH=Math.min(n(g.hpDep),oal),bcA=n(g.bcD)/2,bcH=Math.min(n(g.bcDep),oal);
+  const hasHp=hpA>0&&hpH>0,hasBc=bcA>0&&bcH>0;
+  if(hasHp&&Ln>0&&hpA>rm+1e-9)return err('The hollow point is wider than the meplat.');
+  if(hasHp&&hpA>=rb)return err('The hollow point is as wide as the body.');
+  if(hasBc&&bcA>=rbase)return err('The base cavity is as wide as the base.');
+  if(hasHp&&hasBc&&hpH+bcH>=oal)return err('The hollow point and the base cavity meet.');
+  // V2.6.1: a dish deeper than its opening radius would bulge wider than the opening (undercut, not machinable);
+  // a ball end shallower than its radius is a dish.
+  const shapeErr=(on,shape,a,h,what)=>!on?null:shape==='dish'&&h>a+1e-9?'A dish '+what+' can be at most a hemisphere (depth ≤ '+ut('bullet',a)+', half its Ø). For a deeper cavity use Ball end.'
+    :shape==='ball'&&h<a-1e-9?'A ball-end '+what+' needs a depth of at least '+ut('bullet',a)+' (half its Ø). For a shallower one use Dish.':null;
+  const se=shapeErr(hasHp,g.hpShape,hpA,hpH,'hollow point')||shapeErr(hasBc,g.bcShape,bcA,bcH,'base cavity');
+  if(se)return err(se);
+  const c=x=>Math.max(hasBc?cavR(g.bcShape,bcA,bcH,x):0,hasHp?cavR(g.hpShape,hpA,hpH,oal-x):0);
+  // Wall check at the cavity mouths and along their depth.
+  for(let i=0;i<=400;i++){const x=oal*i/400;if(c(x)>0&&c(x)>=r(x)-1e-6)return err('A cavity breaks through the wall at '+ut('bullet',x)+' from the base.');}
+  const br=[...new Set([0,x1,x2,oal,hasBc?bcH:0,hasHp?oal-hpH:oal].filter(x=>x>=0&&x<=oal))].sort((a,b)=>a-b);
+  const A=x=>Math.PI*(r(x)**2-c(x)**2);
+  let V=0,M1=0;
+  for(let k=0;k<br.length-1;k++){
+    const a=br[k],b=br[k+1],N=1000,h=(b-a)/N;if(!(h>0))continue;
+    let sv=0,sm=0;
+    // endpoints taken just inside the interval: a cavity mouth is a step in c(x), and the step belongs to
+    // one side only (one-sided limits; the 1e-9 nudge changes nothing else measurable)
+    for(let i=0;i<=N;i++){const x=a+i*h,w=i===0||i===N?1:i%2?4:2,ax=A(i===0?a+1e-9*(b-a):i===N?b-1e-9*(b-a):x);sv+=w*ax;sm+=w*x*ax;}
+    V+=sv*h/3;M1+=sm*h/3;
+  }
+  return{oal,rb,rm,rbase,Lt,Lb,Ln,x1,x2,rtr,nose,r,c,V,cg:M1/V,hasHp,hasBc,btAngle:Lt>0?Math.atan((rb-rbase)/Lt)*180/Math.PI:0};
+}
+function benchMass(g){
+  const G=benchGeom(g);if(G.err)return G;
+  const rho=alloyDensity(g);if(!(rho>0))return{err:'Enter the alloy density.'};
+  const gram=G.V/1000*rho,gr=gram/(GR2KG*1000);
+  return{...G,rho,gram,gr,sd:calcSD(gr,g.diam)};
+}
+/* ═══ end of the copied core ═══ */
+function ut(q,v){return(+v).toFixed(2)+' mm';}   // benchGeom's messages call Main's unit formatter
+
+/* ═══ Module physics (new in this module — EST until §20A-anchored for Main) ═══ */
+const MU_REF=1.458e-6,SUTH=110.4;
+function airViscosity(tC){const T=tC+273.15;return MU_REF*Math.pow(T,1.5)/(T+SUTH);}         // Sutherland, Pa·s
+function reynolds(rho,v,d_m,tC){return rho*v*d_m/airViscosity(tC);}
+function helixDeg(d_mm,twist_mm){return Math.atan(Math.PI*d_mm/twist_mm)*180/Math.PI;}
+function spinRps(v,twist_mm){return v/(twist_mm/1000);}
+/* Axial moment of inertia of a uniform-density body of revolution, scaled to the real mass:
+   Ix = m · ∫½(r⁴ − c⁴)dx / ∫(r² − c²)dx (cavities c removed). Same Simpson scheme as benchGeom. */
+function axialInertia(G,mass_kg){
+  const N=2000,h=G.oal/N;let a=0,b=0;
+  for(let i=0;i<=N;i++){const x=Math.min(G.oal,Math.max(0,i*h)),w=i===0||i===N?1:i%2?4:2,r=G.r(x),c=G.c(x);
+    a+=w*(r**4-c**4)/2;b+=w*(r*r-c*c);}
+  return mass_kg*(a/b)*1e-6;
+}
+/* Spin decay (McCoy, Modern Exterior Ballistics, roll damping moment ½ρV²Sd·C_lp·(pd/V)):
+   Ix·dp/dt = ½ρVSd²·C_lp·p, and ds = V dt → p(s) = p₀·exp(ρ·S·d²·C_lp·s / (2·Ix)). Independent of V. */
+function spinDecayFactor(rho,d_m,Ix,clp,s){const S=Math.PI*d_m*d_m/4;return Math.exp(rho*S*d_m*d_m*clp*s/(2*Ix));}
+/* Sg downrange. Sg = Ix²p² / (2ρ·Iy·S·d·V²·C_Mα): with the same air, Miller scales by (p/p₀)²(V₀/V)².
+   McGyro is re-evaluated at the local Mach with the effective twist V/(p·d) (calibres/turn). */
+function sgMillerAt(sg0,v0,v,pRatio){return sg0*pRatio*pRatio*(v0/v)*(v0/v);}
+function sgMcgyroAt(sh,twistCal,v0,v,pRatio,aS,rho){
+  const r=mcgyro(sh.L,sh.Ln,sh.rtr,sh.db,sh.dm,sh.rho,twistCal*(v/v0)/pRatio,v/aS);
+  return r?r.sg*MCG_RHO_STD/rho:null;
+}
+/* Linear-theory epicycle (McCoy ch. 10): arm rates φ'f,s = (P/2)(1 ± √(1 − 1/Sg)). Zero launch yaw and a launch
+   yaw rate give equal opposite arms; the first maximum scales with 1/√(1 − 1/Sg). Y0 at Sg 2 is assumed. */
+const YAW_REF_DEG=1.0;
+function epicycle(sg){
+  if(!(sg>1))return null;const k=Math.sqrt(1-1/sg);
+  return{ratio:(1+k)/(1-k),maxDeg:Math.min(25,YAW_REF_DEG*Math.sqrt(0.5)/k)};
+}
+
+/* ═══ Main data — CORE-09 read-only contract (same reader as the Lab probe) ═══ */
+const MAIN_STORE={idb:'sen_main',store:'kv',key:'db',ls:'sen_platform_v1'};
+const MAIN_SCHEMA={rifles:1,projectiles:1,weathers:1,scopes:1,reticles:1,dopeCards:2};
+const SenMainData={
+  readIdb(){return new Promise(res=>{
+    if(!window.indexedDB)return res(null);
+    let r;try{r=indexedDB.open(MAIN_STORE.idb);}catch(e){return res(null);}
+    r.onupgradeneeded=e=>{e.target.transaction.abort();};
+    r.onerror=e=>{e.preventDefault();res(null);};
+    r.onblocked=()=>res(null);
+    r.onsuccess=()=>{const db=r.result;
+      if(!db.objectStoreNames.contains(MAIN_STORE.store)){db.close();return res(null);}
+      const q=db.transaction(MAIN_STORE.store,'readonly').objectStore(MAIN_STORE.store).get(MAIN_STORE.key);
+      q.onsuccess=()=>{db.close();res(q.result==null?null:q.result);};
+      q.onerror=()=>{db.close();res(null);};};
+  });},
+  async read(){
+    let raw=await this.readIdb(),src='IndexedDB';
+    if(raw==null){try{raw=localStorage.getItem(MAIN_STORE.ls);}catch(e){raw=null;}src='localStorage';}
+    if(raw==null)return{src:null,data:null,err:null};
+    let d;try{d=JSON.parse(raw);}catch(e){return{src,data:null,err:'unreadable ('+e.message+')'};}
+    const newer=Object.keys(d&&d.schema||{}).filter(k=>(d.schema[k]||0)>(MAIN_SCHEMA[k]||0));
+    if(newer.length)return{src,data:null,err:'newer than this module understands ('+newer.join(', ')+') — update the Lab'};
+    return{src,data:d,err:null};
+  }
+};
+
+/* Real reference when the calculator has no data on this device: Altaros Queen .25 (the Berger anchor —
+   60 gr, 0.508″, G7 0.128). Shape fields are not published, so it draws as a schematic. */
+const QUEEN_REF={id:'ref-queen',name:'Altaros Queen .25 (reference)',type:'slug',diam:6.35,mass:60,oal:12.903,bcg7:0.128};
+const MORA_TWISTS=[['.22 · 1:16″',16],['.25 · 1:20″',20],['.30 · 1:20″',20],['.35 · 1:16″',16],['6.5 mm custom · 1:12″',12]];
+const LJU_AIR={tC:20,hPa:974.8,rh:65};
+
+/* ═══ Settings (Lab namespace sen_lab_*) ═══ */
+const STORE_KEY='sen_lab_bench_v1';
+const SET={slots:[{src:'',twistIn:20,dir:'right',mv:280},{src:'',twistIn:16,dir:'right',mv:280}],tails:{},bcA:{},clp:-0.010,maxR:300,model:'miller',exag:true,cmp:false};
+const num=(v,lo,hi,d)=>typeof v==='number'&&isFinite(v)?Math.min(hi,Math.max(lo,v)):d;
+const str=(v,d)=>typeof v==='string'&&v.length<=80?v:d;
+function loadSettings(){
+  let o;try{o=JSON.parse(localStorage.getItem(STORE_KEY)||'{}');}catch(e){o={};}
+  if(!o||typeof o!=='object')return;
+  (Array.isArray(o.slots)?o.slots:[]).slice(0,2).forEach((s,i)=>{if(!s||typeof s!=='object')return;const d=SET.slots[i];
+    d.src=str(s.src,'');d.twistIn=num(s.twistIn,4,60,d.twistIn);d.dir=s.dir==='left'?'left':'right';d.mv=num(s.mv,50,400,d.mv);});
+  const cleanMap=(m,f)=>{const r={};if(m&&typeof m==='object')Object.keys(m).slice(0,200).forEach(k=>{if(/^[A-Za-z0-9_-]{1,40}$/.test(k)){const v=f(m[k]);if(v)r[k]=v;}});return r;};
+  SET.tails=cleanMap(o.tails,t=>t&&typeof t==='object'?{btL:num(t.btL,0,30,null),btAng:num(t.btAng,0,45,null)}:null);
+  SET.bcA=cleanMap(o.bcA,v=>num(v,0.001,2,null));
+  SET.clp=num(o.clp,-0.2,0,SET.clp);SET.maxR=num(o.maxR,50,1000,SET.maxR);
+  SET.model=o.model==='mcgyro'?'mcgyro':'miller';SET.exag=o.exag!==false;SET.cmp=o.cmp===true;
+}
+function saveSettings(){try{localStorage.setItem(STORE_KEY,JSON.stringify(SET));}catch(e){}}
+
+/* ═══ DOM helpers (no HTML sinks) ═══ */
+const $=id=>document.getElementById(id);
+function el(tag,props,...kids){
+  const e=document.createElement(tag);
+  if(props)for(const k in props){
+    if(k==='class')e.className=props[k];
+    else if(k==='style')e.style.cssText=props[k];
+    else if(k.startsWith('on'))e.addEventListener(k.slice(2),props[k]);
+    else if(k in e)e[k]=props[k];
+    else e.setAttribute(k,props[k]);
+  }
+  for(const k of kids){if(k==null)continue;e.appendChild(typeof k==='string'?document.createTextNode(k):k);}
+  return e;
+}
+function tile(label){const v=el('div',{class:'v'},'—'),u=el('div',{class:'u'});const t=el('div',{class:'sc'},el('div',{class:'l'},label),v,u);t.v=v;t.u=u;return t;}
+const f1=x=>x.toFixed(1),f2=x=>x.toFixed(2);
+const inVal=(e,lo,hi,d)=>e.value===''?d:num(+e.value,lo,hi,d);
+let FONT='11px monospace';
+const band=(lo,hi,f)=>lo==null||hi==null?'—':Math.abs(hi-lo)<0.005?f(hi):f(lo)+'–'+f(hi);
+
+/* ═══ Data from Main ═══ */
+let MAIN=null;
+const listOf=k=>(MAIN&&MAIN.data&&Array.isArray(MAIN.data[k]))?MAIN.data[k]:[];
+function sessionRifle(){const d=MAIN&&MAIN.data;return d&&d.session?listOf('rifles').find(r=>r.id===d.session.rifleId)||null:null;}
+function sessionAir(){
+  const d=MAIN&&MAIN.data,w=d&&d.session?listOf('weathers').find(x=>x.id===d.session.curWxId):null;
+  if(w&&isFinite(w.temp)&&isFinite(w.pres))return{tC:w.temp,hPa:wxPres(w),rh:isFinite(w.rh)?w.rh:0,src:'from the calculator\'s current weather "'+w.name+'"'+(w.presType==='sea'?' (sea-level reading converted to station)':'')};
+  return{...LJU_AIR,src:'default — Ljubljana trajectory profile (no current weather in the calculator)'};
+}
+function sources(){
+  const out=listOf('designs').map(d=>({key:'d:'+d.id,kind:'design',obj:d,name:d.name}));
+  listOf('projectiles').filter(p=>p.type!=='pellet').forEach(p=>out.push({key:'p:'+p.id,kind:'proj',obj:p,name:p.name}));
+  listOf('projectiles').filter(p=>p.type==='pellet').forEach(p=>out.push({key:'p:'+p.id,kind:'proj',obj:p,name:p.name+' (pellet)'}));
+  if(!out.some(s=>s.kind==='proj'))out.push({key:'p:'+QUEEN_REF.id,kind:'proj',obj:QUEEN_REF,name:QUEEN_REF.name});
+  return out;
+}
+
+/* ═══ Slot model: geometry, stability at the muzzle, trajectory ═══ */
+function tailFor(p){
+  const t=SET.tails[p.id]||{},d=p.diam,haveBase=p.baseD>0&&p.baseD<d;
+  let btL=t.btL,ang=t.btAng,baseD=null,note=null;
+  if(btL>0&&ang>0){baseD=d-2*btL*Math.tan(ang*Math.PI/180);
+    if(haveBase&&Math.abs(baseD-p.baseD)>0.02)note='tail length and angle give base Ø '+f2(baseD)+' mm, the profile says '+f2(p.baseD)+' mm';}
+  else if(btL>0&&haveBase){baseD=p.baseD;ang=Math.atan((d-baseD)/2/btL)*180/Math.PI;}
+  else if(btL>0)note='enter the tail angle (or a base Ø in the calculator profile)';
+  return{btL:btL>0&&baseD>0?btL:0,baseD:baseD>0?baseD:d,ang:ang||0,note,missing:!(btL>0)&&haveBase};
+}
+function projGeomInput(p){
+  const tail=tailFor(p),shape=p.noseL>0&&p.rtr!=null&&p.meplat!=null;
+  const noseL=shape?p.noseL:Math.min(p.oal*0.45,p.diam*0.9);
+  const g={diam:p.diam,noseL,rtr:shape?p.rtr:1,meplat:shape?p.meplat:p.diam*0.35,btL:tail.btL,baseD:tail.baseD,bearL:Math.max(0,p.oal-noseL-tail.btL)};
+  return{g,tail,schematic:!shape};
+}
+function buildModel(cfg,air){
+  const src=sources().find(s=>s.key===cfg.src)||sources()[0];if(!src)return{err:'No projectile or design available.'};
+  const m={key:src.key,kind:src.kind,name:src.name,gaps:[]},o=src.obj,rho=airDensity(air.tC,air.hPa,air.rh),aS=sos(air.tC);
+  Object.assign(m,{rho,aS,air,twist_mm:cfg.twistIn*25.4,dir:cfg.dir,mv:cfg.mv});
+  if(src.kind==='design'){
+    const b=benchMass(o);if(b.err)return{...m,err:b.err};
+    Object.assign(m,{G:b,mass:b.gr,diam:o.diam,oal:b.oal,hp:b.hasHp||b.hasBc,pellet:false,
+      shape:{L:b.oal/o.diam,Ln:b.Ln/o.diam,rtr:b.rtr,db:b.rbase*2/o.diam,dm:b.rm*2/o.diam,rho:b.rho}});
+    m.gaps.push('Theoretical design (§10A): mass, Sg and flow are predictions, not data.');
+    const bc=SET.bcA[o.id];m.bc=bc?{stated:bc,drag:'g7',trued:false,assumed:true}:null;
+    if(!bc)m.gaps.push('No BC for this design (BENCH-04 parked): type an ASSUMED G7 BC to see stability along the range.');
+  }else{
+    const gi=projGeomInput(o),G=benchGeom(gi.g);if(G.err)return{...m,err:G.err};
+    Object.assign(m,{G,mass:o.mass,diam:o.diam,oal:o.oal,hp:false,pellet:o.type==='pellet',tail:gi.tail,schematic:gi.schematic,shape:mcgyroShape(o)});
+    if(gi.schematic)m.gaps.push('Nose shape not in the profile: drawn as a schematic, McGyro not computed.');
+    if(gi.tail.missing)m.gaps.push('Profile has a base Ø but no tail length: enter it here (Lab only — the projectile form gets the fields at graduation).');
+    if(gi.tail.note)m.gaps.push('Tail: '+gi.tail.note+'.');
+    if(m.shape&&gi.tail.btL>0)m.shape={...m.shape,db:gi.tail.baseD/o.diam};
+    const drag=o.bcg7>0?'g7':o.bcg1>0?'g1':null;
+    m.bc=drag?{stated:drag==='g7'?o.bcg7:o.bcg1,drag,trued:bcIsTrued(o,drag),assumed:false}:null;
+    if(!m.bc)m.gaps.push('BC pending: no trajectory, stability shown at the muzzle only.');
+    if(o===QUEEN_REF)m.gaps.push('No calculator data on this device: showing the Queen reference.');
+  }
+  return finishModel(m);
+}
+function finishModel(m){
+  m.helix=helixDeg(m.diam,m.twist_mm);m.p0=spinRps(m.mv,m.twist_mm);
+  m.Ix=axialInertia(m.G,m.mass*GR2KG);
+  if(m.pellet){m.gaps.push('Pellet: drag-stabilised, no Sg (§9S); the flow drawing is made for slugs, not a diabolo.');}
+  else{
+    const C=millerC(m.diam,m.oal);
+    m.sgMil0=C.valid?calcSg(m.mass,m.diam,m.oal,m.twist_mm,m.mv,C.c,m.air.tC,m.air.hPa):null;
+    if(!C.valid)m.gaps.push('L/D < 2.0: Miller not computed.');
+    const mg=m.shape?mcgyroAir(m.shape,m.twist_mm/m.diam,m.mv,m.air.tC,m.air.hPa,m.air.rh):null;
+    m.sgMcg0=mg?mg.sg:null;
+    if(m.hp)m.gaps.push('Hollow point / base cavity: Miller and McGyro assume a solid, evenly dense slug.');
+  }
+  if(m.bc){const pen=!m.bc.trued&&m.sgMil0!=null&&m.sgMil0>=1&&m.sgMil0<1.5;
+    m.bc.eff=pen?bcEffSg(m.bc.stated,m.sgMil0):m.bc.stated;m.bc.pen=pen;
+    const r=sessionRifle(),bc7=m.bc.drag==='g7'?m.bc.eff:0,bc1=m.bc.drag==='g1'?m.bc.eff:0;
+    m.traj=rk4traj(m.mv,bc7,m.mass,r&&r.zero>0?r.zero:50,SET.maxR,(r&&r.sight>0?r.sight:44)/1000,m.rho,m.aS,5,m.bc.drag,bc1,null,null);}
+  return m;
+}
+/* Everything at one range: velocity, Mach, Re, spin (no decay / assumed decay), Sg bands, yaw. */
+function stateAt(m,x){
+  const pt=m.traj?m.traj.find(p=>p.range>=x-1e-6)||m.traj[m.traj.length-1]:null;
+  const v=pt?pt.v:(x===0?m.mv:null);if(v==null)return{v:null};
+  const s=pt?pt.range:0,dec=spinDecayFactor(m.rho,m.diam/1000,m.Ix,SET.clp,s);
+  const o={x:s,v,M:v/m.aS,Re:reynolds(m.rho,v,m.diam/1000,m.air.tC),pHi:m.p0,pLo:m.p0*dec,tof:pt?pt.tof:0};
+  if(m.sgMil0!=null){o.milHi=sgMillerAt(m.sgMil0,m.mv,v,1);o.milLo=sgMillerAt(m.sgMil0,m.mv,v,dec);}
+  if(m.sgMcg0!=null&&m.shape){o.mcgHi=sgMcgyroAt(m.shape,m.twist_mm/m.diam,m.mv,v,1,m.aS,m.rho);o.mcgLo=sgMcgyroAt(m.shape,m.twist_mm/m.diam,m.mv,v,dec,m.aS,m.rho);}
+  const lo=SET.model==='mcgyro'?(o.mcgLo??o.milLo):(o.milLo??o.mcgLo);
+  o.sgUse=lo;o.epi=lo!=null?epicycle(lo):null;
+  return o;
+}
+
+/* ═══ Flow view (illustrative) — body frame, flight to the right, air from the right ═══ */
+const SEP_LIM=[10,16];   // engraved slug → turbulent after the band: attached ≤ 10°, partial ≤ 16°, separated above (illustrative)
+function FlowView(canvas,inset,color){
+  const cx=canvas.getContext('2d'),ix=inset.getContext('2d');
+  let W=0,H=0,M=null,S=null,st=null,P=[],V=[],K=[],trail=[],spin=0,phiF=0,phiS=0,tumble=0,t=0;
+  const dpr=window.devicePixelRatio||1;
+  function size(){W=canvas.clientWidth||360;H=canvas.clientHeight||230;canvas.width=W*dpr;canvas.height=H*dpr;cx.setTransform(dpr,0,0,dpr,0,0);
+    inset.width=96*dpr;inset.height=96*dpr;ix.setTransform(dpr,0,0,dpr,0,0);}
+  function setModel(m){M=m;size();layout();}
+  function layout(){
+    if(!M||M.err)return;const G=M.G,s=Math.min(W*0.40/G.oal,H*0.30/(2*G.rb));
+    S={s,tipX:W*0.64,cy:H/2,fB:G.oal*s,fT:(G.oal-G.Lt)*s,fN:G.Ln*s,R:G.rb*s,cgF:(G.oal-G.cg)*s};
+    P=[];for(let i=0;i<220;i++)P.push(newP(Math.random()*W));
+    V=[];for(let i=0;i<70;i++)V.push({ph:Math.random()*6.28,k:0.25+0.75*Math.random(),sd:Math.random()<0.5?-1:1});
+    K=[];for(let i=0;i<80;i++)K.push({f:S.fB+Math.random()*W,yy:Math.random()*2-1,ph:Math.random()*6.28});
+    sides(0);
+  }
+  function newP(X){return{f:S.tipX-X,y0:3+(H/2-6)*Math.pow(Math.random(),1.5),sd:Math.random()<0.5?-1:1};}
+  const rad=f=>f<0||f>S.fB?0:M.G.r(M.G.oal-f/S.s)*S.s;
+  /* Separation per side: the leeward side (top when the nose is up) separates earlier with yaw. */
+  function sides(alphaDeg){
+    const th=M.G.btAngle,fB=S.fB,fT=S.fT,LtS=fB-fT;let x0;
+    if(!(th>0))x0=fB;else if(th<=SEP_LIM[0])x0=fB;else if(th<=SEP_LIM[1])x0=fT+LtS*(0.85-0.75*(th-SEP_LIM[0])/(SEP_LIM[1]-SEP_LIM[0]));else x0=fT+1;
+    S.state=!(th>0)?'flat base: separates at the base edge':x0>=fB?'attached to the base edge':x0<=fT+1?'separated at the tail start':'partial separation on the tail';
+    const q=Math.min(1,Math.abs(alphaDeg)/6),lee=alphaDeg>0?-1:1;
+    S.side={};[-1,1].forEach(sd=>{const xs=th>0&&sd===lee?x0-q*(x0-fT):x0,r0=rad(Math.min(xs,fB-0.01)),sep=xs<fB-0.5,sl=sep?Math.tan(0.15*th*Math.PI/180):0;
+      const rAB=sep?Math.max(r0-(fB-xs)*sl,2):r0;S.side[sd]={x0:xs,r0,sep,sl,rAB,Lc:2.6*rAB+20};});
+  }
+  function shear(sd,f){const o=S.side[sd];if(f<S.fB)return o.r0-(f-o.x0)*o.sl;const u=(f-S.fB)/o.Lc;return o.rAB*(1-u*u);}
+  function wakeR(sd,f){return 0.45*S.side[sd].rAB*Math.exp(-(f-S.fB)/260);}
+  function reff(sd,f){const o=S.side[sd];if(f<o.x0)return rad(f);if(f<S.fB+o.Lc)return Math.max(shear(sd,f),wakeR(sd,f));return wakeR(sd,Math.max(f,S.fB));}
+  function blThick(f){if(f<0||f>S.fB)return 0;const u=f/S.fB;return f>S.fN?5+9*u:2.5+3.5*u;}
+  function setState(s){st=s;}
+  function yawNow(){
+    if(!st||!st.epi||M.pellet)return 0;
+    const k=st.epi.maxDeg/2;return k*(Math.sin(phiF)-Math.sin(phiS));          // side-view (pitch) component
+  }
+  function frame(dt,run){
+    if(!M||M.err||!S){cx.clearRect(0,0,W,H);ix.clearRect(0,0,96,96);return;}
+    if(run)t+=dt;const v=st&&st.v?st.v:M.mv,U=v/285*2.4*(run?1:0);
+    const unstable=!M.pellet&&st&&st.sgUse!=null&&st.sgUse<1;
+    if(run&&st){spin+=dt*0.9*(st.pLo/M.p0)*(M.dir==='left'?-1:1);
+      if(st.epi){const w=1.2;phiS+=dt*w;phiF+=dt*w*Math.min(12,st.epi.ratio);}
+      if(unstable)tumble+=dt*1.6;}
+    const alpha=unstable?0:yawNow(),aDisp=unstable?tumble*57.3:alpha*(SET.exag?5:1);
+    sides(unstable?0:alpha);
+    cx.clearRect(0,0,W,H);drawParticles(U,aDisp,unstable);drawWake(U,unstable);drawBody(aDisp);drawLabels(unstable);drawInset(alpha);
+  }
+  function rotAbout(X,Y,a){const c=Math.cos(a),s=Math.sin(a),px=S.tipX-S.cgF,dx=X-px,dy=Y-S.cy;return[px+dx*c-dy*s,S.cy+dx*s+dy*c];}
+  function drawParticles(U,aDisp,unstable){
+    cx.lineWidth=1.1;const aR=-aDisp*Math.PI/180;
+    for(const p of P){
+      const d=blThick(p.f);let fac=1,col='rgba(55,138,221,0.55)',jit=0;
+      if(d>0&&p.y0<d){fac=0.3+0.7*p.y0/d;col=p.f>S.fN?'rgba(186,117,23,0.85)':'rgba(186,117,23,0.55)';if(p.f>S.fN)jit=(Math.random()-0.5)*2;}
+      if(p.f>S.side[p.sd].x0&&p.y0<10){fac=0.75;col='rgba(216,90,48,0.6)';jit=(Math.random()-0.5)*3*S.side[p.sd].rAB/S.R;}
+      if(unstable&&p.f>-S.R&&p.y0<S.R*1.2){col='rgba(216,90,48,0.6)';jit=(Math.random()-0.5)*6;}
+      p.f+=U*fac;if(S.tipX-p.f<-5)Object.assign(p,newP(W+5));
+      const L=6*Math.max(U,0.4)*fac,f1=p.f-L,y1=Math.sqrt(p.y0*p.y0+reff(p.sd,f1)**2),y2=Math.sqrt(p.y0*p.y0+reff(p.sd,p.f)**2)+jit;
+      const k=Math.exp(-p.y0/40),[ax,ay]=rotAbout(S.tipX-f1,S.cy+p.sd*y1,aR*k),[bx,by]=rotAbout(S.tipX-p.f,S.cy+p.sd*y2,aR*k);
+      cx.strokeStyle=col;cx.beginPath();cx.moveTo(ax,ay);cx.lineTo(bx,by);cx.stroke();
+    }
+  }
+  function drawWake(U,unstable){
+    if(unstable)return;cx.lineWidth=1.1;
+    [-1,1].forEach(sd=>{const o=S.side[sd],xv=S.fB+0.45*o.Lc,yv=0.5*o.rAB;
+      for(const q of V){if(q.sd!==sd)continue;q.ph+=0.06*Math.max(U,0.3)*(1.2-0.5*q.k);const ax=0.42*o.Lc*q.k,ay=0.42*o.rAB*q.k;
+        const pt=ph=>[S.tipX-(xv+ax*Math.cos(ph)),S.cy+sd*(yv-ay*Math.sin(ph))];const a=pt(q.ph-0.25),b=pt(q.ph);
+        cx.strokeStyle='rgba(216,90,48,0.8)';cx.beginPath();cx.moveTo(a[0],a[1]);cx.lineTo(b[0],b[1]);cx.stroke();}});
+    const rw=Math.max(S.side[-1].rAB,S.side[1].rAB),fc=S.fB+Math.max(S.side[-1].Lc,S.side[1].Lc);
+    for(const k of K){k.f+=Math.max(U,0.3)*(0.7+0.2*Math.sin(k.ph));k.ph+=0.08;if(S.tipX-k.f<0){k.f=fc;k.yy=Math.random()*2-1;}
+      if(k.f<fc)continue;const a=0.6*rw*Math.exp(-(k.f-fc)/400)+4,yy=S.cy+k.yy*a+Math.sin((k.f-fc)/28-t*7)*0.35*rw;
+      cx.fillStyle='rgba(216,90,48,0.6)';cx.fillRect(S.tipX-k.f,yy,2.2,1.4);}
+    cx.setLineDash([4,4]);cx.strokeStyle='rgba(216,90,48,0.9)';cx.lineWidth=1;
+    [-1,1].forEach(sd=>{const o=S.side[sd];cx.beginPath();for(let f=o.x0;f<=S.fB+o.Lc;f+=2){const X=S.tipX-f,Y=S.cy+sd*shear(sd,f);f===o.x0?cx.moveTo(X,Y):cx.lineTo(X,Y);}cx.stroke();});
+    cx.setLineDash([]);
+  }
+  function drawBody(aDisp){
+    const G=M.G;cx.save();cx.translate(S.tipX-S.cgF,S.cy);cx.rotate(-aDisp*Math.PI/180);
+    const X=f=>S.cgF-f,pts=[];for(let i=0;i<=240;i++){const f=S.fB*i/240;pts.push([X(f),-rad(f)]);}
+    cx.beginPath();pts.forEach(([x,y],i)=>i?cx.lineTo(x,y):cx.moveTo(x,y));for(let i=pts.length-1;i>=0;i--)cx.lineTo(pts[i][0],-pts[i][1]);cx.closePath();
+    cx.fillStyle='#888780';cx.fill();cx.strokeStyle='#5F5E5A';cx.lineWidth=1;cx.stroke();
+    drawCavities();drawEngraving(X);
+    cx.fillStyle='#E24B4A';[-1,1].forEach(sd=>{const o=S.side[sd];cx.beginPath();cx.arc(X(o.x0),sd*rad(Math.min(o.x0,S.fB-0.01)),3.5,0,6.283);cx.fill();});
+    cx.strokeStyle='rgba(255,255,255,0.5)';cx.beginPath();cx.moveTo(X(S.fN),-S.R-5);cx.lineTo(X(S.fN),-S.R-12);cx.stroke();
+    cx.restore();
+  }
+  function drawCavities(){
+    const G=M.G;if(!G.hasHp&&!G.hasBc)return;cx.fillStyle='#06080b';
+    const X=x=>S.cgF-(G.oal-x)*S.s;cx.beginPath();let on=false;
+    for(let i=0;i<=200;i++){const x=G.oal*i/200,c=G.c(x)*S.s;if(c>0.3){on?cx.lineTo(X(x),-c):cx.moveTo(X(x),-c);on=true;}}
+    for(let i=200;i>=0;i--){const x=G.oal*i/200,c=G.c(x)*S.s;if(c>0.3)cx.lineTo(X(x),c);}
+    if(on){cx.closePath();cx.fill();}
+  }
+  /* Engraving: grooves follow the rifling helix. Over the bearing surface a groove turns by Δθ = 2π·L/twist,
+     so in side view it runs almost along the axis. Right twist: the near face moves down (clockwise from behind). */
+  function drawEngraving(X){
+    if(M.pellet)return;const fa=S.fN,fb=S.fT,R=S.R,Lmm=(fb-fa)/S.s;if(Lmm<=0.2)return;
+    const dTh=2*Math.PI*Lmm/M.twist_mm*(M.dir==='left'?-1:1);cx.lineWidth=1;cx.strokeStyle='rgba(30,30,30,0.75)';
+    for(let k=0;k<6;k++){const th=spin*2*Math.PI+k*Math.PI/3;
+      for(let j=0;j<12;j++){const u0=j/12,u1=(j+1)/12,a0=th+dTh*(1-u0),a1=th+dTh*(1-u1);if(Math.cos(a0)<=0.05||Math.cos(a1)<=0.05)continue;
+        cx.beginPath();cx.moveTo(X(fa+(fb-fa)*u0),R*Math.sin(a0)*0.96);cx.lineTo(X(fa+(fb-fa)*u1),R*Math.sin(a1)*0.96);cx.stroke();}}
+  }
+  function drawLabels(unstable){
+    cx.fillStyle='#bdbab1';cx.font=FONT;
+    cx.fillText('flight →  air ←',W-118,H-8);
+    cx.fillText('transition (probable)',Math.max(4,S.tipX-S.fN-70),S.cy-S.R-16);
+    const o=S.side[-1];cx.fillText('separation',Math.max(4,S.tipX-o.x0-30),S.cy+S.R+22);
+    cx.fillText('wake',Math.max(4,S.tipX-S.fB-o.Lc-60),S.cy-o.rAB-14);
+    if(unstable){cx.fillStyle='#e07a5f';cx.fillText('Sg < 1 — not gyroscopically stable: tumbles',8,H-10);}
+  }
+  function drawInset(alpha){
+    ix.clearRect(0,0,96,96);const c=48;ix.strokeStyle='#6f6d67';ix.lineWidth=1;ix.beginPath();ix.arc(c,c,30,0,6.283);ix.stroke();
+    ix.fillStyle='#bdbab1';ix.font=FONT;ix.fillText('from behind',4,92);
+    if(!st||!st.epi||M.pellet){ix.fillText(M.pellet?'no Sg':'—',38,52);return;}
+    const k=st.epi.maxDeg/2,sc=26/Math.max(st.epi.maxDeg,0.5),sg=M.dir==='left'?1:-1;   // right twist: clockwise seen from behind
+    const zx=k*(Math.cos(phiF)-Math.cos(phiS))*sg,zy=k*(Math.sin(phiF)-Math.sin(phiS));
+    trail.push([c+zx*sc,c-zy*sc]);if(trail.length>160)trail.shift();
+    ix.strokeStyle=color;ix.beginPath();trail.forEach(([x,y],i)=>i?ix.lineTo(x,y):ix.moveTo(x,y));ix.stroke();
+    ix.fillStyle=color;ix.beginPath();ix.arc(trail[trail.length-1][0],trail[trail.length-1][1],2.5,0,6.283);ix.fill();
+    ix.fillStyle='#bdbab1';ix.fillText(f1(st.epi.maxDeg)+'° max',4,12);
+  }
+  return{setModel,setState,frame,size:()=>{size();layout();},clearTrail:()=>{trail=[];}};
+}
+
+/* ═══ Slot UI ═══ */
+const COLORS=['#7eb8c4','#c8a96e'];
+const UI=[];
+function buildSlotUI(i){
+  const c=COLORS[i],srcSel=el('select',{'aria-label':'Projectile or design'}),pick=el('select',{'aria-label':'Pick a twist'}),
+    tw=el('input',{type:'number',step:'0.5',inputMode:'decimal'}),dir=el('select',{'aria-label':'Twist direction'},el('option',{value:'right'},'right'),el('option',{value:'left'},'left')),
+    mv=el('input',{type:'number',step:'0.5',inputMode:'decimal'}),btL=el('input',{type:'number',step:'0.1',inputMode:'decimal'}),btA=el('input',{type:'number',step:'0.5',inputMode:'decimal'}),
+    bcA=el('input',{type:'number',step:'0.001',inputMode:'decimal'});
+  const tailBox=el('div',{class:'grid'},el('div',{},el('div',{class:'lbl'},'Boat-tail length mm'),btL),el('div',{},el('div',{class:'lbl'},'Boat-tail angle °'),btA));
+  const bcBox=el('div',{},el('div',{class:'lbl'},'BC G7 lb/in² — ASSUMED (design has no BC)'),bcA);
+  const canvas=el('canvas',{class:'flow'}),inset=el('canvas',{class:'yaw'});
+  const t={v:tile('Velocity'),M:tile('Mach'),re:tile('Reynolds'),p:tile('Spin'),mil:tile('Sg Miller'),mcg:tile('Sg McGyro'),yaw:tile('Yaw (illustr.)'),flow:tile('Flow (illustr.)')};
+  const muzzle=el('div',{class:'note'}),bcLine=el('div',{class:'note'}),err=el('div',{class:'note warn'});
+  const panel=el('div',{class:'panel',style:'--c:'+c},
+    el('h2',{},el('span',{class:'slotname'},i?'B':'A'),'projectile'),
+    srcSel,
+    el('div',{class:'grid'},el('div',{},el('div',{class:'lbl'},'Twist'),pick),el('div',{},el('div',{class:'lbl'},'1 turn in (inches)'),tw),
+      el('div',{},el('div',{class:'lbl'},'Direction'),dir),el('div',{},el('div',{class:'lbl'},'MV m/s'),mv)),
+    tailBox,bcBox,err,
+    el('div',{class:'view'},canvas,inset),
+    el('div',{class:'scs'},...Object.values(t).map(x=>{x.style.setProperty('--c',c);return x;})),
+    muzzle,bcLine);
+  const view=FlowView(canvas,inset,c);
+  const ui={i,panel,srcSel,pick,tw,dir,mv,btL,btA,bcA,tailBox,bcBox,err,t,muzzle,bcLine,view,model:null};
+  wireSlot(ui);UI.push(ui);return panel;
+}
+function wireSlot(ui){
+  const cfg=()=>SET.slots[ui.i],src=()=>sources().find(s=>s.key===cfg().src);
+  ui.srcSel.addEventListener('change',()=>{cfg().src=ui.srcSel.value;changed(ui);});
+  ui.pick.addEventListener('change',()=>{const v=ui.pick.value;if(!v)return;const[tw,dr]=v.split('|');cfg().twistIn=+tw;if(dr)cfg().dir=dr;ui.pick.value='';changed(ui);});
+  ui.tw.addEventListener('change',()=>{cfg().twistIn=inVal(ui.tw,4,60,cfg().twistIn);changed(ui);});
+  ui.dir.addEventListener('change',()=>{cfg().dir=ui.dir.value;changed(ui);});
+  ui.mv.addEventListener('change',()=>{cfg().mv=inVal(ui.mv,50,400,cfg().mv);changed(ui);});
+  const tail=()=>{const s=src();if(!s||s.kind!=='proj')return;const v=x=>inVal(x,0,45,null);
+    SET.tails[s.obj.id]={btL:v(ui.btL),btAng:v(ui.btA)};changed(ui);};
+  ui.btL.addEventListener('change',tail);ui.btA.addEventListener('change',tail);
+  ui.bcA.addEventListener('change',()=>{const s=src();if(!s||s.kind!=='design')return;const v=inVal(ui.bcA,0.001,2,null);
+    if(ui.bcA.value===''||v==null)delete SET.bcA[s.obj.id];else SET.bcA[s.obj.id]=v;changed(ui);});
+}
+function fillSlotControls(ui){
+  const cfg=SET.slots[ui.i],list=sources();
+  ui.srcSel.replaceChildren(...['design','proj'].map(k=>{const g=el('optgroup',{label:k==='design'?'Bench designs (theoretical)':'Real projectiles'});
+    list.filter(s=>s.kind===k).forEach(s=>g.appendChild(el('option',{value:s.key},s.name)));return g;}).filter(g=>g.children.length));
+  if(!list.some(s=>s.key===cfg.src))cfg.src=(list.find(s=>s.kind==='proj')||list[0]).key;
+  ui.srcSel.value=cfg.src;
+  const opts=[el('option',{value:''},'Pick…')];
+  listOf('rifles').filter(r=>r.twist>0&&r.twistDir!=='smooth').forEach(r=>opts.push(el('option',{value:(r.twist/25.4)+'|'+(r.twistDir==='left'?'left':'right')},r.name+' · 1:'+f1(r.twist/25.4)+'″')));
+  MORA_TWISTS.forEach(([n,t])=>opts.push(el('option',{value:t+'|'},'Mora '+n)));
+  ui.pick.replaceChildren(...opts);ui.pick.value='';
+  ui.tw.value=cfg.twistIn;ui.dir.value=cfg.dir;ui.mv.value=cfg.mv;
+  const s=list.find(x=>x.key===cfg.src);
+  ui.tailBox.classList.toggle('hide',!s||s.kind!=='proj'||s.obj===QUEEN_REF);ui.bcBox.classList.toggle('hide',!s||s.kind!=='design');
+  if(s&&s.kind==='proj'){const t=SET.tails[s.obj.id]||{};ui.btL.value=t.btL??'';ui.btA.value=t.btAng??'';}
+  if(s&&s.kind==='design')ui.bcA.value=SET.bcA[s.obj.id]??'';
+}
+function changed(ui){saveSettings();recompute(ui);renderAll();}
+function recompute(ui){
+  fillSlotControls(ui);ui.model=buildModel(SET.slots[ui.i],readAir());
+  ui.err.textContent=ui.model.err||'';ui.view.setModel(ui.model.err?null:ui.model);ui.view.clearTrail();
+}
+
+/* ═══ Rendering ═══ */
+function readAir(){const a=sessionAir(),v=(e,d)=>e.value===''?d:+e.value;
+  return{tC:num(v($('airT'),a.tC),-30,50,a.tC),hPa:num(v($('airP'),a.hPa),500,1100,a.hPa),rh:num(v($('airH'),a.rh),0,100,a.rh)};}
+function active(){return UI.filter(u=>u.i===0||SET.cmp);}
+function renderAll(){
+  $('slots').children[1].classList.toggle('hide',!SET.cmp);
+  const maxR=SET.maxR,r=$('range');r.max=maxR;if(+r.value>maxR)r.value=maxR;
+  const x=+r.value;$('rangeOut').textContent=x+' m';
+  active().forEach(u=>renderSlot(u,x));renderGaps();renderChart(x);
+}
+function renderSlot(u,x){
+  const m=u.model,t=u.t;if(!m||m.err){Object.values(t).forEach(z=>{z.v.textContent='—';z.u.textContent='';});u.muzzle.textContent='';u.bcLine.textContent='';return;}
+  const s=stateAt(m,x);u.view.setState(s);u.state=s;
+  if(s.v==null){Object.values(t).forEach(z=>{z.v.textContent='—';z.u.textContent='';});t.v.u.textContent='needs a BC';}
+  else{
+    t.v.v.textContent=f1(s.v);t.v.u.textContent='m/s · '+Math.round(s.v/0.3048)+' fps';
+    t.M.v.textContent=s.M.toFixed(3);t.M.u.textContent=s.M>=0.8?'≥ 0.8: shoulder may go supersonic':'subsonic';t.M.v.classList.toggle('warn',s.M>=0.8);
+    t.re.v.textContent=(s.Re/1e5).toFixed(2)+'·10⁵';t.re.u.textContent='on Ø · EST';
+    t.p.v.textContent=band(s.pLo,s.pHi,Math.round);t.p.u.textContent='rev/s · '+Math.round(s.pHi*60).toLocaleString('en')+' rpm muzzle';
+    t.mil.v.textContent=band(s.milLo,s.milHi,f2);t.mil.u.textContent=x>0?'EST downrange':'verified (muzzle)';
+    t.mcg.v.textContent=band(s.mcgLo,s.mcgHi,f2);t.mcg.u.textContent=m.shape?(x>0?'EST downrange':'muzzle'):'shape missing';
+    t.yaw.v.textContent=s.epi?f1(s.epi.maxDeg)+'°':s.sgUse!=null&&s.sgUse<=1?'tumbles':'—';t.yaw.u.textContent=s.epi?'fast:slow '+f1(s.epi.ratio)+':1':'';
+    t.flow.v.textContent=m.G.btAngle>0?f1(m.G.btAngle)+'° tail':'flat base';t.flow.u.textContent='';
+  }
+  [t.mil,t.mcg].forEach(z=>z.v.classList.toggle('warn',/^(0\.|1\.[0-4])/.test(z.v.textContent)));
+  u.muzzle.textContent='Muzzle: '+f1(m.mass)+' gr · L/D '+f2(m.oal/m.diam)+' · helix '+f2(m.helix)+'° · Sg Miller '+(m.sgMil0!=null?f2(m.sgMil0):'—')+' · McGyro '+(m.sgMcg0!=null?f2(m.sgMcg0):'—')+' · I_x '+(m.Ix*1e9).toFixed(2)+'·10⁻⁹ kg·m²';
+  u.bcLine.textContent=!m.bc?'BC: pending — no range data.':'BC '+m.bc.drag.toUpperCase()+' '+m.bc.stated.toFixed(4)+(m.bc.assumed?' ASSUMED':m.bc.trued?' trued':' stated')+
+    (m.bc.trued?' → used as measured, no stability penalty':m.bc.pen?' → '+m.bc.eff.toFixed(4)+' effective (Sg '+f2(m.sgMil0)+' < 1.5: ×'+(m.bc.eff/m.bc.stated).toFixed(3)+', '+((m.bc.eff/m.bc.stated-1)*100).toFixed(1)+' %)':m.sgMil0!=null&&m.sgMil0<1?' → Sg < 1: not stable, penalty not defined':m.sgMil0==null?' → no penalty (Miller Sg not computed)':' → no penalty (Sg ≥ 1.5)');
+}
+function renderGaps(){
+  const g=['Flow picture, separation, wake and yaw size are illustrative — not CFD, not used by the calculator.',
+    'Downrange Sg and spin decay are EST: roll damping C_lp = '+SET.clp+' is assumed (no airgun data), downrange method not yet anchored (§20A).',
+    'Engraving trips the boundary layer at the start of the bearing surface (probable, unverified).'];
+  active().forEach(u=>{const m=u.model;if(!m)return;(m.err?[m.err]:m.gaps).forEach(x=>g.push((u.i?'B: ':'A: ')+x));
+    if(u.state&&u.state.M>=0.8)g.push((u.i?'B: ':'A: ')+'Mach ≥ 0.8 at this range: local supersonic flow at the shoulder possible (not modelled).');});
+  $('gaps').replaceChildren(...g.map(x=>el('li',{},x)));
+}
+/* Chart: Sg band vs range per slot, Miller and McGyro; lines at Sg 1.0 and 1.5; cursor at the selected range. */
+function renderChart(x){
+  const NS='http://www.w3.org/2000/svg',mk=(t,a,txt)=>{const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);if(txt!=null)e.textContent=txt;return e;};
+  const W=Math.max(300,Math.round($('chartbox').clientWidth||640)),H=Math.round(Math.min(260,Math.max(190,W*0.42))),L=40,R=10,T=10,B=28,maxR=SET.maxR;
+  const series=[];active().forEach(u=>{const m=u.model;if(!m||m.err||!m.traj)return;
+    const rows=m.traj.filter(p=>p.range<=maxR).map(p=>({x:p.range,...stateAt(m,p.range)}));
+    [['mil','Miller'],['mcg','McGyro']].forEach(([k,n])=>{if(rows[0][k+'Hi']!=null)series.push({u,k,n,rows});});});
+  const ymax=Math.max(2,...series.flatMap(s=>s.rows.map(r=>r[s.k+'Hi']||0)))*1.08;
+  const X=v=>L+(W-L-R)*v/maxR,Y=v=>T+(H-T-B)*(1-Math.min(v,ymax)/ymax);
+  const svg=mk('svg',{class:'chart',viewBox:`0 0 ${W} ${H}`,role:'img','aria-label':'Gyroscopic stability along the range'});
+  for(let g=0;g<=ymax;g+=0.5){svg.appendChild(mk('line',{x1:L,x2:W-R,y1:Y(g),y2:Y(g),stroke:'rgba(255,255,255,.07)'}));svg.appendChild(mk('text',{x:L-6,y:Y(g)+4,'text-anchor':'end','font-size':11,fill:'#6f6d67'},g.toFixed(1)));}
+  for(let d=0;d<=maxR;d+=maxR>300?100:50)svg.appendChild(mk('text',{x:X(d),y:H-8,'text-anchor':'middle','font-size':11,fill:'#6f6d67'},d+' m'));
+  [[1,'#d4574e'],[1.5,'#c8a96e']].forEach(([g,c])=>svg.appendChild(mk('line',{x1:L,x2:W-R,y1:Y(g),y2:Y(g),stroke:c,'stroke-dasharray':'4 4'})));
+  series.forEach(s=>{const c=COLORS[s.u.i],up=s.rows.map(r=>[X(r.x),Y(r[s.k+'Hi'])]),lo=s.rows.map(r=>[X(r.x),Y(r[s.k+'Lo'])]).reverse(),P=a=>a.map(([a1,b1],i)=>(i?'L':'M')+a1.toFixed(1)+' '+b1.toFixed(1)).join('');
+    const main=(SET.model==='mcgyro')===(s.k==='mcg');
+    svg.appendChild(mk('path',{d:P(up)+P(lo).replace('M','L')+'Z',fill:c,'fill-opacity':main?0.28:0.10,stroke:'none'}));
+    svg.appendChild(mk('path',{d:P(up),fill:'none',stroke:c,'stroke-width':main?2:1,'stroke-dasharray':s.k==='mcg'?'5 3':''}));});
+  svg.appendChild(mk('line',{x1:X(x),x2:X(x),y1:T,y2:H-B,stroke:'#f4f3ef','stroke-width':1}));
+  $('chartbox').replaceChildren(series.length?svg:el('div',{class:'note'},'No range data: the projectile needs a BC (designs: an assumed one).'));
+  $('legend').replaceChildren(...series.map(s=>el('span',{},el('span',{class:'sw',style:'background:'+COLORS[s.u.i]+(s.k==='mcg'?';opacity:.5':'')}),(s.u.i?'B ':'A ')+s.n+(s.k==='mcg'?' (dashed)':''))),
+    el('span',{},el('span',{class:'sw',style:'background:#d4574e'}),'Sg 1.0'),el('span',{},el('span',{class:'sw',style:'background:#c8a96e'}),'Sg 1.5'));
+}
+
+/* ═══ Boot ═══ */
+let RUN=true,last=0;
+function loop(ts){const dt=last?Math.min(0.05,(ts-last)/1000):0;last=ts;active().forEach(u=>u.view.frame(dt,RUN));requestAnimationFrame(loop);}
+function wireGlobal(){
+  const air=()=>{UI.forEach(recompute);renderAll();};
+  ['airT','airP','airH'].forEach(id=>$(id).addEventListener('change',air));
+  $('maxR').addEventListener('change',()=>{SET.maxR=inVal($('maxR'),50,1000,SET.maxR);$('maxR').value=SET.maxR;saveSettings();air();});
+  $('clp').addEventListener('change',()=>{SET.clp=inVal($('clp'),-0.2,0,SET.clp);$('clp').value=SET.clp;saveSettings();renderAll();});
+  $('model').addEventListener('change',()=>{SET.model=$('model').value==='mcgyro'?'mcgyro':'miller';saveSettings();UI.forEach(u=>u.view.clearTrail());renderAll();});
+  $('exag').addEventListener('change',()=>{SET.exag=$('exag').checked;saveSettings();});
+  $('cmp').addEventListener('change',()=>{SET.cmp=$('cmp').checked;saveSettings();UI.forEach(u=>u.view.size());renderAll();});
+  $('range').addEventListener('input',renderAll);
+  $('pause').addEventListener('click',()=>{RUN=!RUN;$('pause').textContent=RUN?'Pause':'Play';});
+  window.addEventListener('resize',()=>{active().forEach(u=>u.view.size());renderChart(+$('range').value);});
+}
+async function boot(){
+  loadSettings();FONT='11px '+getComputedStyle(document.body).fontFamily;
+  MAIN=await SenMainData.read();const d=MAIN.data,n=k=>listOf(k).length;
+  $('mainstatus').textContent=MAIN.err?'⚠ Calculator data '+MAIN.err+'.':!d?'No calculator data on this device yet — open the calculator once. Showing the Queen reference only.':
+    'Calculator data from '+MAIN.src+': '+n('designs')+' designs · '+n('projectiles')+' projectiles · '+n('rifles')+' rifles (read-only).';
+  const a=sessionAir(),r=sessionRifle();$('airT').value=a.tC;$('airP').value=+a.hPa.toFixed(1);$('airH').value=a.rh;$('airsrc').textContent='Air '+a.src+'. Station pressure — QNH must be converted first.';
+  if(r&&r.mv>0&&!localStorage.getItem(STORE_KEY))SET.slots.forEach(s=>{s.mv=r.mv;if(r.twist>0){s.twistIn=+(r.twist/25.4).toFixed(2);s.dir=r.twistDir==='left'?'left':'right';}});
+  $('maxR').value=SET.maxR;$('clp').value=SET.clp;$('model').value=SET.model;$('exag').checked=SET.exag;$('cmp').checked=SET.cmp;
+  $('slots').append(buildSlotUI(0),buildSlotUI(1));
+  wireGlobal();UI.forEach(recompute);renderAll();requestAnimationFrame(loop);
+}
+boot();
+</script>
+</body>
+</html>
